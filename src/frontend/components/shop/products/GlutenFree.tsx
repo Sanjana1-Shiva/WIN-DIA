@@ -94,7 +94,7 @@ export function ProductRange({ heading, headingId, products, theme }: ProductRan
     // Create combo product with selections
     const comboData = {
       ...toStoreProduct(selectedComboProduct, theme),
-      comboSelections: selections,
+      flavorSelections: selections, // Cart looks for this key
       // Add flavor breakdown to display name
       flavorBreakdown: Object.entries(selections)
         .filter(([_, count]) => count > 0)

@@ -119,7 +119,7 @@ export function toStoreProduct(
     image,
 
     countInStock: 100,
-    netWeight: 200,
+    netWeight: (product as any).netWeight || 200, // Use product-specific netWeight if available
   };
 
   // Preserve the real database UUID if available (from API products)
