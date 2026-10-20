@@ -323,7 +323,7 @@ function ProductDetailContent({
 >
   {/* Bundle badge */}
   <div className={styles.bundleBadge}>
-    12-PACKET BUNDLE
+    6-PACKET BUNDLE
   </div>
 
   {/* Wishlist heart */}
