@@ -24,6 +24,7 @@ import {
   type Product,
   type ProductTheme,
 } from "./productShared";
+import { ComboSelector } from "./ComboSelector";
 
 import styles from "./ProductDetail.module.scss";
 
@@ -90,6 +91,43 @@ function ProductDetailContent({
     wishlistItems.some((item: any) => (item.id || item._id) === storeProduct.id),
     [wishlistItems, storeProduct.id]
   );
+
+  /* -----------------------------
+     Combo Selector (for combo products)
+  ----------------------------- */
+  const isComboProduct = product.name?.toLowerCase().includes('combo') || 
+                          product.name?.toLowerCase().includes('assorted');
+  
+  const [isComboModalOpen, setIsComboModalOpen] = useState(false);
+
+  // Define available flavors for combo
+  const comboFlavors = [
+    { id: 'curry-leaves', name: 'Curry Leaves', available: true, stock: 100 },
+    { id: 'garlic', name: 'Garlic', available: true, stock: 100 },
+    { id: 'jeera', name: 'Jeera', available: true, stock: 100 },
+    { id: 'onion', name: 'Onion', available: true, stock: 100 },
+  ];
+
+  const handleComboConfirm = async (selections: Record<string, number>) => {
+    if (!(await requireAuth())) return;
+
+    // Add combo with user's flavor selections
+    const comboProduct = {
+      ...storeProduct,
+      flavorSelections: selections,
+      customNote: `Combo: ${Object.entries(selections)
+        .filter(([_, count]) => count > 0)
+        .map(([id, count]) => {
+          const flavor = comboFlavors.find(f => f.id === id);
+          return `${flavor?.name} (${count})`;
+        })
+        .join(', ')}`
+    };
+
+    dispatch(addToCart(comboProduct, 1));
+    toast.success("Combo added to cart with your flavor selection!");
+    setQuantity(quantity + 1);
+  };
 
   /* -----------------------------
      Product image carousel
@@ -477,19 +515,29 @@ function ProductDetailContent({
 
           <button
             type="button"
-            onClick={() =>
-              setQuantity(quantity + 1)
-            }
+            onClick={() => {
+              if (isComboProduct) {
+                setIsComboModalOpen(true);
+              } else {
+                setQuantity(quantity + 1);
+              }
+            }}
             className={styles.addToCart}
           >
-            Add to Cart
+            {isComboProduct ? 'Customize Combo' : 'Add to Cart'}
           </button>
 
           {/* Buy now */}
 
           <button
             type="button"
-            onClick={buyNow}
+            onClick={() => {
+              if (isComboProduct) {
+                setIsComboModalOpen(true);
+              } else {
+                buyNow();
+              }
+            }}
             className={styles.buyNow}
           >
             Buy Now
@@ -560,6 +608,16 @@ function ProductDetailContent({
             )}
           </ul>
         </div>
+      )}
+
+      {/* Combo Selector Modal */}
+      {isComboProduct && (
+        <ComboSelector
+          isOpen={isComboModalOpen}
+          onClose={() => setIsComboModalOpen(false)}
+          onConfirm={handleComboConfirm}
+          availableFlavors={comboFlavors}
+        />
       )}
     </section>
   );
