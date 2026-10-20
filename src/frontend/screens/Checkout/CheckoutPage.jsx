@@ -33,7 +33,7 @@ export default function CheckoutPage() {
   const dispatch = useDispatch();
   const router = useRouter();
   const { cartItems, buyNowItem, promoApplied, promoCode } = useSelector((s) => s.cart);
-  const { user, authFetch } = useAuth();
+  const { user, authFetch, token } = useAuth();
 
   // If buyNowItem is set, checkout only that single item; otherwise use full cart
   const checkoutItems = buyNowItem ? [buyNowItem] : cartItems;
@@ -182,9 +182,10 @@ export default function CheckoutPage() {
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) { toast.error("Please fix the form errors"); return; }
 
-    if (!user) {
+    // If not authenticated, save to localStorage only
+    if (!user || !token) {
       saveLocalAddress();
-      toast.success("Address saved. Login before placing order.");
+      toast.success("Address saved locally. Please login to save permanently.");
       return;
     }
 
@@ -227,8 +228,15 @@ export default function CheckoutPage() {
       setForm({ type: "home", name: "", street: "", city: "", state: "Karnataka", pincode: "", phone: "", isDefault: false });
       setFormErrors({});
       toast.success("Address saved!");
-    } catch {
-      toast.error("Could not save address. Please check your connection and try again.");
+    } catch (err) {
+      console.error("Address save error:", err);
+      // If authentication error, save locally as fallback
+      if (err.message === 'Not authenticated') {
+        saveLocalAddress();
+        toast.success("Address saved locally. Please login to save permanently.");
+      } else {
+        toast.error("Could not save address. Please check your connection and try again.");
+      }
     }
   };
 
