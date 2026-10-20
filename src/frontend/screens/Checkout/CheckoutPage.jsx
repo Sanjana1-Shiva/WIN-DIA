@@ -27,6 +27,17 @@ function loadRazorpay() {
   });
 }
 
+// Safe JSON reader: returns null instead of throwing when the body is empty or not JSON
+async function readJson(res) {
+  try {
+    const text = await res.text();
+    if (!text) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 const STATES = ["Karnataka","Tamil Nadu","Kerala","Maharashtra","Delhi","Gujarat","Rajasthan","Uttar Pradesh","West Bengal","Telangana","Andhra Pradesh","Madhya Pradesh","Bihar","Punjab","Haryana","Odisha","Assam","Other"];
 
 export default function CheckoutPage() {
@@ -114,15 +125,15 @@ export default function CheckoutPage() {
         }),
       });
       
-      const data = await res.json();
+      const data = await readJson(res);
       
-      if (data.success) {
+      if (data && data.success) {
         setCouponApplied(true);
         dispatch(setPromoApplied(true));
         dispatch(setPromoCode(couponCode.trim()));
         toast.success(`Coupon applied! You saved ₹${data.data.discount_amount.toFixed(0)}`);
       } else {
-        toast.error(data.error || "Invalid coupon code");
+        toast.error((data && data.error) || "Invalid coupon code");
       }
     } catch (error) {
       toast.error("Failed to apply coupon");
@@ -158,7 +169,14 @@ export default function CheckoutPage() {
     localStorage.removeItem(LOCAL_ADDRESS_KEY);
     setAddresses([]);
     setSelectedAddr(null);
-    authFetch("/api/addresses").then((r) => r.json()).then((d) => {
+    authFetch("/api/addresses").then(async (r) => {
+      const d = await readJson(r);
+      if (!r.ok || !d) {
+        console.error("Load addresses failed:", r.status, d);
+        // Same toast id so it never shows up twice
+        toast.error("Could not load addresses", { id: "load-addresses" });
+        return;
+      }
       const rawAddresses = d.addresses || d.data || [];
       if (rawAddresses.length > 0) {
         const normalized = rawAddresses.map((a) => ({
@@ -177,7 +195,10 @@ export default function CheckoutPage() {
         const def = normalized.find((a) => a.isDefault) || normalized[0];
         if (def) setSelectedAddr(def._id);
       }
-    }).catch(() => toast.error("Could not load addresses"));
+    }).catch((err) => {
+      console.error("Load addresses error:", err);
+      toast.error("Could not load addresses", { id: "load-addresses" });
+    });
   }, [user, authFetch]);
 
   const saveLocalAddress = () => {
@@ -224,12 +245,15 @@ export default function CheckoutPage() {
           is_default: form.isDefault,
         }),
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        // Real save failure — tell the user, don't silently pretend it worked.
-        toast.error(data.error || "Could not save address. Please try again.");
+
+      const data = await readJson(res);
+
+      if (!res.ok || !data || data.error || !data.address) {
+        console.error("Address save failed:", res.status, data);
+        toast.error((data && data.error) || `Could not save address (status ${res.status})`);
         return;
       }
+
       const addr = data.address;
       const saved = {
         ...addr,
@@ -306,8 +330,8 @@ export default function CheckoutPage() {
           couponCode: couponApplied ? couponCode : null,
         }),
       });
-      const data = await res.json();
-      if (!data.success) { toast.error(data.error || "Could not place order"); setPlacing(false); return; }
+      const data = await readJson(res);
+      if (!data || !data.success) { toast.error((data && data.error) || "Could not place order"); setPlacing(false); return; }
 
       if (!data.requiresPayment) {
         dispatch(clearBuyNowItem());
@@ -335,9 +359,9 @@ export default function CheckoutPage() {
               method: "POST",
               body: JSON.stringify({ orderId: data.order.id, razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature }),
             });
-            const vData = await vRes.json();
-            if (vData.success) { dispatch(clearBuyNowItem()); dispatch(clearCart()); toast.success("Payment successful!"); router.push(`/order-confirmation?orderId=${data.order.id}`); }
-            else toast.error(vData.error || "Payment verification failed");
+            const vData = await readJson(vRes);
+            if (vData && vData.success) { dispatch(clearBuyNowItem()); dispatch(clearCart()); toast.success("Payment successful!"); router.push(`/order-confirmation?orderId=${data.order.id}`); }
+            else toast.error((vData && vData.error) || "Payment verification failed");
           } finally { setPlacing(false); }
         },
         modal: {
@@ -617,7 +641,7 @@ export default function CheckoutPage() {
 
               <div className={styles.summaryItems}>
                 {checkoutItems.map((item) => (
-                  <div key={item._id || item.id} className={styles.summaryItem}>
+                  <div key={item.cartId || item._id || item.id} className={styles.summaryItem}>
                     <img src={item.image || "/images/product-methi.jpg"} alt={item.name} />
                     <div style={{ flex: 1 }}>
                       <p className={styles.sItemName}>{item.name}</p>
@@ -796,5 +820,3 @@ export default function CheckoutPage() {
     </div>
   );
 }
-
-

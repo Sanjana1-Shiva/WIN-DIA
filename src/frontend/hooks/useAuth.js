@@ -3,10 +3,21 @@
 // Wrap your app: <AuthProvider>{children}</AuthProvider>
 
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { supabase } from "@/src/frontend/lib/supabase/client";
 
 const AuthContext = createContext(null);
+
+// Safe JSON reader: returns null instead of throwing on empty or invalid bodies
+async function readJson(res) {
+  try {
+    const text = await res.text();
+    if (!text) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null);
@@ -24,7 +35,7 @@ export function AuthProvider({ children }) {
     }
     try {
       const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${accessToken}` } });
-      const data = await res.json();
+      const data = await readJson(res);
       setIsAdmin(Boolean(data?.user?.role === "admin"));
     } catch {
       setIsAdmin(false);
@@ -56,7 +67,10 @@ export function AuthProvider({ children }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
+    if (!data) {
+      return { success: false, error: `Login failed (status ${res.status})` };
+    }
     if (data.success) {
       if (data.access_token && data.refresh_token) {
         await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
@@ -71,7 +85,8 @@ export function AuthProvider({ children }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password, phone, dob, city, state, gender }),
     });
-    return res.json();
+    const data = await readJson(res);
+    return data || { success: false, error: `Registration failed (status ${res.status})` };
   };
 
   const logout = async () => {
@@ -90,7 +105,9 @@ export function AuthProvider({ children }) {
     setIsAdmin(false);
   };
 
-  const authFetch = (url, options = {}) => {
+  // useCallback keeps authFetch stable between renders, so effects that
+  // depend on it don't re-run (and re-fetch) on every render.
+  const authFetch = useCallback((url, options = {}) => {
     // If no token, redirect to login instead of making the request
     if (!token) {
       if (typeof window !== 'undefined') {
@@ -107,7 +124,7 @@ export function AuthProvider({ children }) {
         ...options.headers,
       },
     });
-  };
+  }, [token]);
 
   return (
     <AuthContext.Provider value={{ user, token, loading, login, register, logout, authFetch, isAdmin, adminChecked }}>

@@ -123,7 +123,29 @@ export class CartServiceImpl implements CartService {
       if (!ownershipCheck.success) return failure(ownershipCheck.error);
     }
 
-    const itemRes = await this.cartItemRepo.findItem(cartId, productId);
+    // The browser can send a slug (e.g. "everyday-jeera") instead of a UUID. product_id is a uuid
+    // column, so querying it with a slug throws a 500. Resolve the slug first.
+    let resolvedProductId = productId;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId);
+    if (!isUuid) {
+      const base = productId.trim().toLowerCase();
+      const stripped = base.replace(/^(gluten-free|everyday)-/, '');
+      const candidates = Array.from(new Set([base, stripped, `${stripped}-thins`, `${stripped}s-thins`]));
+      let found: string | null = null;
+      for (const slug of candidates) {
+        const prodRes = await this.productRepo.findBySlug(slug);
+        if (prodRes.success && prodRes.value) {
+          found = prodRes.value.id;
+          break;
+        }
+      }
+      if (!found) {
+        return success(true); // Nothing stored under this id — idempotent
+      }
+      resolvedProductId = found;
+    }
+
+    const itemRes = await this.cartItemRepo.findItem(cartId, resolvedProductId);
     if (!itemRes.success) return failure(itemRes.error);
     if (!itemRes.value) {
       return success(true); // Already removed — idempotent

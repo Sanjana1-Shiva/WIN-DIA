@@ -94,7 +94,7 @@ export class SupabaseOrderRepository
       const { data, error } = await client.rpc('create_checkout_order_transaction', {
         p_user_id: userId,
         p_order_data: orderData,
-        p_items: orderItems,
+        p_order_items: orderItems, // Match SQL function parameter name
         p_payment_data: paymentData,
         p_shipment_data: shipmentData,
       });

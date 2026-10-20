@@ -126,7 +126,9 @@ function ProductDetailContent({
 
     dispatch(addToCart(comboProduct, 1));
     toast.success("Combo added to cart with your flavor selection!");
-    setQuantity(quantity + 1);
+    // Only update the on-screen counter. Calling setQuantity() here would
+    // dispatch a second addToCart (a plain combo with no flavour selection).
+    setQuantityState(quantity + 1);
   };
 
   /* -----------------------------
@@ -293,6 +295,13 @@ function ProductDetailContent({
 
     const current =
       recQuantities[recRouteId] ?? 0;
+
+    // A combo needs a flavour selection, so send the shopper to its page
+    // instead of adding a plain combo to the cart.
+    if (recTheme === "combo" && nextQuantity > current) {
+      router.push(`/product/${recRouteId}`);
+      return;
+    }
 
     if (nextQuantity > current) {
       if (!(await requireAuth())) return;
@@ -502,9 +511,13 @@ function ProductDetailContent({
 
             <button
               type="button"
-              onClick={() =>
-                setQuantity(quantity + 1)
-              }
+              onClick={() => {
+                if (isComboProduct) {
+                  setIsComboModalOpen(true);
+                } else {
+                  setQuantity(quantity + 1);
+                }
+              }}
               aria-label="Increase quantity"
             >
               +
@@ -622,4 +635,3 @@ function ProductDetailContent({
     </section>
   );
 }
-
