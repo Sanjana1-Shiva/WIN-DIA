@@ -32,22 +32,29 @@ type ComboSelectorProps = {
 export function ComboSelector({ isOpen, onClose, onConfirm, availableFlavors }: ComboSelectorProps) {
   const [selections, setSelections] = useState<Record<string, number>>({});
   
+  // Filter available flavors first
+  const availableOnly = availableFlavors.filter(f => f.available);
+  const unavailableCount = availableFlavors.filter(f => !f.available).length;
+  
   // Initialize with available flavors only
   useEffect(() => {
     if (isOpen) {
       const initial: Record<string, number> = {};
-      availableFlavors
-        .filter(f => f.available)
-        .forEach(f => {
-          initial[f.id] = 0;
-        });
+      availableOnly.forEach(f => {
+        initial[f.id] = 0;
+      });
       setSelections(initial);
     }
-  }, [isOpen, availableFlavors]);
+  }, [isOpen, availableOnly]);
 
   const totalSelected = Object.values(selections).reduce((sum, count) => sum + count, 0);
   const flavorsWithSelection = Object.entries(selections).filter(([_, count]) => count > 0).length;
-  const isValid = totalSelected === 6 && flavorsWithSelection >= 3;
+  
+  // Validation: Must select exactly 6 packets
+  // Must include AT LEAST 3 different flavors (since we only have 4 flavors total)
+  // Ideally all available flavors should be represented
+  const minFlavorsRequired = Math.min(3, availableOnly.length); // If only 3 flavors available, require all 3
+  const isValid = totalSelected === 6 && flavorsWithSelection >= minFlavorsRequired;
   const remaining = 6 - totalSelected;
 
   const handleIncrement = (flavorId: string) => {
@@ -84,9 +91,9 @@ export function ComboSelector({ isOpen, onClose, onConfirm, availableFlavors }: 
   const handleConfirm = () => {
     if (!isValid) {
       if (totalSelected !== 6) {
-        toast.error(`Please select exactly 6 packets (${remaining} ${remaining === 1 ? 'packet' : 'packets'} remaining)`);
-      } else if (flavorsWithSelection < 3) {
-        toast.error("Please select at least 3 different flavors");
+        toast.error(`Please select exactly 6 packets (${remaining} ${remaining === 1 ? 'packet' : 'packets'} ${remaining > 0 ? 'more needed' : 'too many'})`);
+      } else if (flavorsWithSelection < minFlavorsRequired) {
+        toast.error(`Please select at least ${minFlavorsRequired} different flavors from the ${availableOnly.length} available`);
       }
       return;
     }
@@ -96,9 +103,6 @@ export function ComboSelector({ isOpen, onClose, onConfirm, availableFlavors }: 
   };
 
   if (!isOpen) return null;
-
-  const availableOnly = availableFlavors.filter(f => f.available);
-  const unavailableCount = availableFlavors.filter(f => !f.available).length;
 
   return (
     <AnimatePresence>
@@ -114,7 +118,7 @@ export function ComboSelector({ isOpen, onClose, onConfirm, availableFlavors }: 
           <div className={styles.header}>
             <div>
               <h2>Customize Your Combo</h2>
-              <p>Select 6 packets from at least 3 different flavors</p>
+              <p>Select 6 packets. Include at least 3 different flavors from the 4 available.</p>
             </div>
             <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
               <FiX />
@@ -144,6 +148,11 @@ export function ComboSelector({ isOpen, onClose, onConfirm, availableFlavors }: 
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Info notice */}
+          <div className={styles.infoNotice}>
+            <span>ℹ️ Mix and match! You can select any combination - for example: 2 Jeera + 2 Garlic + 1 Onion + 1 Curry Leaves</span>
           </div>
 
           {/* Unavailable notice */}
@@ -206,10 +215,10 @@ export function ComboSelector({ isOpen, onClose, onConfirm, availableFlavors }: 
           {!isValid && totalSelected > 0 && (
             <div className={styles.validation}>
               {totalSelected !== 6 && (
-                <p>⚠️ Please select exactly 6 packets ({remaining} {remaining === 1 ? 'packet' : 'packets'} {remaining > 0 ? 'more' : 'less'})</p>
+                <p>⚠️ Please select exactly 6 packets ({remaining} {remaining === 1 ? 'packet' : 'packets'} {remaining > 0 ? 'more needed' : 'too many'})</p>
               )}
-              {totalSelected === 6 && flavorsWithSelection < 3 && (
-                <p>⚠️ Please select at least 3 different flavors (currently {flavorsWithSelection})</p>
+              {totalSelected === 6 && flavorsWithSelection < minFlavorsRequired && (
+                <p>⚠️ Please select at least {minFlavorsRequired} different flavors (currently selected: {flavorsWithSelection})</p>
               )}
             </div>
           )}

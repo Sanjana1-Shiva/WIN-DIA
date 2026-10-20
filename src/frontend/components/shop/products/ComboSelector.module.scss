@@ -95,6 +95,17 @@
   font-weight: 600;
 }
 
+.infoNotice {
+  padding: 12px 24px;
+  background: #e7f3ff;
+  border-bottom: 1px solid #b3d9ff;
+  color: #004085;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .notice {
   display: flex;
   align-items: center;
