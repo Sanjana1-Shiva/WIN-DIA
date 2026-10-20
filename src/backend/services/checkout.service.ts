@@ -322,8 +322,10 @@ export class CheckoutServiceImpl implements CheckoutService {
 
       if (productId === COMBO_PRODUCT_ID) {
         // Each combo is its own line with its own selection set.
-        if (this.parseWholeNumber(item.qty ?? item.quantity ?? 1) !== 1) {
-          return failure(new ValidationError('Each assorted combo must be added separately with its own flavour selection.'));
+        // Quantity can be > 1 if user adds same combo multiple times
+        const qty = this.parseWholeNumber(item.qty ?? item.quantity ?? 1);
+        if (qty === null || qty < 1) {
+          return failure(new ValidationError('Invalid quantity for assorted combo.'));
         }
 
         const comboRes = await this.productRepo.findById(COMBO_PRODUCT_ID);
@@ -339,12 +341,16 @@ export class CheckoutServiceImpl implements CheckoutService {
 
         const selRes = this.validateComboSelections(item, availableFlavours);
         if (!selRes.success) return failure(selRes.error);
-        for (const sel of selRes.value) addPackets(sel.product_id, sel.bundles * PACKETS_PER_BUNDLE);
+        
+        // Add packets for each quantity of this combo
+        for (const sel of selRes.value) {
+          addPackets(sel.product_id, sel.bundles * qty);
+        }
 
         lines.push({
           kind: 'combo',
           productId,
-          qty: 1,
+          qty,
           bundles: 1, // 1 bundle = 6 packets for combo
           name,
           flavor: null,
