@@ -98,7 +98,8 @@ export default function CartPage() {
       
       dispatch(setCart(migratedCart));
       
-      if (needsDeduplication) {
+      if (needsDeduplication && migratedCart.length < cartItems.length) {
+        // Only show message if we actually removed items
         toast.success("Removed duplicate items from cart!");
       } else if (needsMigration) {
         toast.success("Cart updated with new pricing!");

@@ -54,8 +54,20 @@ const cartSlice = createSlice({
           // Item already exists, just increment quantity
           existing.qty += Number(item.qty || 1);
         } else {
-          // New item, add to cart
-          s.cartItems.push(item);
+          // New item - check if there's an almost-duplicate (same product but no cartId)
+          // This can happen if item is added before flavorSelections is set
+          const baseId = getId(item);
+          const almostDuplicate = s.cartItems.find((c) => 
+            getId(c) === baseId && !c.cartId && item.cartId
+          );
+          
+          if (almostDuplicate) {
+            // Replace the item without cartId with the one that has cartId
+            const index = s.cartItems.indexOf(almostDuplicate);
+            s.cartItems[index] = item;
+          } else {
+            s.cartItems.push(item);
+          }
         }
       },
       prepare: (product, qty = 1) => ({ payload: { product, qty } }),
