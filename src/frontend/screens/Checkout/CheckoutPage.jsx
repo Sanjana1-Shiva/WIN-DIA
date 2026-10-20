@@ -70,8 +70,112 @@ export default function CheckoutPage() {
   const shipping = 0; // FREE DELIVERY — always ₹0, enforced server-side
   const total = subtotal - discount + shipping;
 
+  // Calculate total packets for validation (6-multiple check)
+  const totalPackets = checkoutItems.reduce((sum, item) => sum + (item.qty * 6), 0);
+  const isMultipleOfSix = totalPackets % 6 === 0;
+  const remainderPackets = totalPackets % 6;
+
   // Handle coupon application
   const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error("Please enter a coupon code");
+      return;
+    }
+    
+    setCouponLoading(true);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: couponCode.trim(),
+          cart_total: subtotal,
+        }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setCouponApplied(true);
+        dispatch(setPromoApplied(true));
+        dispatch(setPromoCode(couponCode.trim()));
+        toast.success(`Coupon applied! You saved ₹${data.data.discount_amount.toFixed(0)}`);
+      } else {
+        toast.error(data.error || "Invalid coupon code");
+      }
+    } catch (error) {
+      toast.error("Failed to apply coupon");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponApplied(false);
+    setCouponCode("");
+    dispatch(setPromoApplied(false));
+    dispatch(setPromoCode(""));
+    toast.success("Coupon removed");
+  };
+
+  // Load addresses
+  useEffect(() => {
+    const localAddress = (() => {
+      try { return JSON.parse(localStorage.getItem(LOCAL_ADDRESS_KEY) || "null"); } catch { return null; }
+    })();
+
+    if (!user) {
+      if (localAddress) {
+        Promise.resolve().then(() => {
+          setAddresses([localAddress]);
+          setSelectedAddr(localAddress._id);
+        });
+      }
+      return;
+    }
+
+    localStorage.removeItem(LOCAL_ADDRESS_KEY);
+    setAddresses([]);
+    setSelectedAddr(null);
+    authFetch("/api/addresses").then((r) => r.json()).then((d) => {
+      const rawAddresses = d.addresses || d.data || [];
+      if (rawAddresses.length > 0) {
+        const normalized = rawAddresses.map((a) => ({
+          ...a,
+          _id: a.id,
+          name: a.full_name || a.name,
+          street: a.address_line1 || a.street,
+          city: a.city,
+          state: a.state,
+          pincode: a.pincode,
+          phone: a.phone,
+          type: a.type || "home",
+          isDefault: a.is_default,
+        }));
+        setAddresses(normalized);
+        const def = normalized.find((a) => a.isDefault) || normalized[0];
+        if (def) setSelectedAddr(def._id);
+      }
+    }).catch(() => toast.error("Could not load addresses"));
+  }, [user, authFetch]);
+
+  const saveLocalAddress = () => {
+    const localId = `local-${Date.now()}`;
+    const saved = {
+      ...form,
+      _id: localId,
+      id: localId,
+      is_default: form.isDefault,
+      isDefault: form.isDefault,
+    };
+    localStorage.setItem(LOCAL_ADDRESS_KEY, JSON.stringify(saved));
+    setAddresses((prev) => [saved, ...prev.filter((a) => !String(a._id || a.id).startsWith("local-"))]);
+    setSelectedAddr(saved._id);
+    setShowForm(false);
+    setForm({ type: "home", name: "", street: "", city: "", state: "Karnataka", pincode: "", phone: "", isDefault: false });
+    setFormErrors({});
+    return saved;
+  };
 
   const handleSaveAddress = async () => {
     const errors = validateAddress(form);
