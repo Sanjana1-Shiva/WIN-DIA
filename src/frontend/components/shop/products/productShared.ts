@@ -74,7 +74,10 @@ export function toStoreProduct(
   product: Product,
   theme: ProductTheme
 ) {
-  const id = toRouteId(theme, product);
+  // For combo products, use the UUID directly (backend expects this)
+  const isComboProduct = product.id === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
+                          theme === 'combo';
+  const id = isComboProduct ? product.id : toRouteId(theme, product);
 
   let image: string;
 

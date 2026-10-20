@@ -78,7 +78,8 @@ export const everydayProducts = [
 ] as const;
 
 export const comboOffer = {
-  id: "assorted-combo",
+  id: "9d17cedd-4abd-4765-af1e-f368d17bad32", // UUID from backend
+  slug: "windia-assorted-combo-v2", // Slug from backend  
   name: "WIN-DIA FibreRich Thins Assorted Combo",
   title: "4 Flavours · 6 Packets",
   flavour: "Assorted",
