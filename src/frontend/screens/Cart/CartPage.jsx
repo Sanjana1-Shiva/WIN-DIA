@@ -65,6 +65,24 @@ export default function CartPage() {
     return 0;
   };
 
+  // Helper function to calculate paid vs free packets
+  const getPacketBreakdown = (bundles) => {
+    if (bundles === 1) return { total: 6, paid: 6, free: 0 };
+    if (bundles === 2) return { total: 12, paid: 10, free: 2 };
+    if (bundles === 3) return { total: 18, paid: 14, free: 4 };
+    if (bundles === 4) return { total: 24, paid: 18, free: 6 };
+    if (bundles === 5) return { total: 30, paid: 22, free: 8 };
+    if (bundles >= 6) {
+      const extraBundles = bundles - 6;
+      return { 
+        total: 36 + (extraBundles * 6), 
+        paid: 26 + (extraBundles * 4), 
+        free: 10 + (extraBundles * 2) 
+      };
+    }
+    return { total: 0, paid: 0, free: 0 };
+  };
+
   // Calculate totals ONLY after mounted
   const totalBundles = mounted ? cartItems.reduce((sum, item) => sum + (item.qty || 0), 0) : 0;
   const subtotal = mounted ? getBundlePrice(totalBundles) : 0;
@@ -73,6 +91,9 @@ export default function CartPage() {
   const total = subtotal - discount + shipping;
   const progress = 100; // Always free shipping
   const remaining = 0;
+
+  // Calculate packet breakdown (paid vs free)
+  const packetBreakdown = mounted ? getPacketBreakdown(totalBundles) : { total: 0, paid: 0, free: 0 };
 
   // Calculate total packets in cart (each bundle = 6 packets)
   const totalPackets = totalBundles * 6;
@@ -338,6 +359,52 @@ export default function CartPage() {
                 {promoApplied && <div className={`${styles.bRow} ${styles.bDiscount}`}><span>Discount</span><span>−₹{discount.toFixed(2)}</span></div>}
                 <div className={styles.bRow}><span>Shipping</span><span className={shipping === 0 ? styles.free : ""}>{shipping === 0 ? "FREE" : `₹${shipping}`}</span></div>
               </div>
+
+              {/* Packet Breakdown - Show paid vs free packets */}
+              {totalBundles > 0 && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(201,168,76,0.08) 0%, rgba(201,168,76,0.03) 100%)',
+                  border: '1px solid rgba(201,168,76,0.2)',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  marginBottom: '16px',
+                  fontSize: '0.9rem'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    marginBottom: '8px',
+                    fontWeight: 600,
+                    color: '#3B1F0F'
+                  }}>
+                    <FiPackage style={{ color: '#C9A84C' }} />
+                    <span>Your Order Breakdown</span>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '4px',
+                    fontSize: '0.85rem',
+                    color: '#6B5948'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Total packets:</span>
+                      <strong style={{ color: '#3B1F0F' }}>{packetBreakdown.total} packets ({totalBundles} bundle{totalBundles > 1 ? 's' : ''})</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>You pay for:</span>
+                      <strong style={{ color: '#3B1F0F' }}>{packetBreakdown.paid} packets</strong>
+                    </div>
+                    {packetBreakdown.free > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Free bonus:</span>
+                        <strong style={{ color: '#28a745' }}>🎉 {packetBreakdown.free} packets FREE!</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className={styles.totalRow}>
                 <span>Total <small style={{ fontWeight: 400, opacity: 0.7 }}>(GST included)</small></span>
