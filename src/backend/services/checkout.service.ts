@@ -54,6 +54,14 @@ const SLUG_TO_PRODUCT_ID: Record<string, string> = {
   'windia-assorted-combo-v2': COMBO_PRODUCT_ID,
 };
 
+// Names must match the order_combo_selections_flavor_check constraint exactly.
+const PRODUCT_ID_TO_FLAVOR: Record<string, string> = {
+  '0b225519-b378-4e45-bc13-5bfa41459c81': 'Curry Leaves',
+  'f30e1bc4-a532-42b2-b59a-3244521c4ce6': 'Garlic',
+  'dca9fd97-c09d-44f2-8af7-b02c0670593c': 'Jeera',
+  'c640d38c-2422-4082-a132-99d393648f21': 'Onion',
+};
+
 const REGULAR_PRODUCT_IDS = new Set<string>([
   '0b225519-b378-4e45-bc13-5bfa41459c81',
   'f30e1bc4-a532-42b2-b59a-3244521c4ce6',
@@ -351,7 +359,7 @@ export class CheckoutServiceImpl implements CheckoutService {
           kind: 'combo',
           productId,
           qty,
-          bundles: 1, // 1 bundle = 6 packets for combo
+          bundles: qty, // each combo = 1 bundle (6 packets); total bundles drives the DB price
           name,
           flavor: null,
           image,
@@ -426,20 +434,45 @@ export class CheckoutServiceImpl implements CheckoutService {
     const orderItems: Record<string, unknown>[] = [];
 
     for (const line of lines) {
-      const unitBundles = line.kind === 'combo' ? 1 : 1; // Combo is 1 bundle now
+      const unitBundles = 1; // one regular bundle, or one combo (= 1 bundle)
       if (!unitPrices.has(unitBundles)) unitPrices.set(unitBundles, await this.getDbPrice(unitBundles));
+      const unitPrice = unitPrices.get(unitBundles);
 
-      const payload: Record<string, unknown> = {
+      if (line.kind === 'combo' && line.selections) {
+        // A cart line with qty N shares one flavour set. The DB function only accepts a combo
+        // with combo_number 1 per order item (qty 1 works, qty > 1 raises "Invalid combo_number"),
+        // so send N separate qty-1 items, each carrying its own copy of the selections.
+        const perComboNetWeight = line.netWeightGrams / line.qty;
+        for (let i = 0; i < line.qty; i++) {
+          orderItems.push({
+            product_id: line.productId,
+            name: line.name,
+            price: unitPrice,
+            qty: 1,
+            flavor: line.flavor,
+            net_weight_grams: perComboNetWeight,
+            image: line.image,
+            combo_number: 1,
+            [COMBO_SELECTIONS_KEY]: line.selections.map((s) => ({
+              combo_number: 1,
+              flavor: PRODUCT_ID_TO_FLAVOR[s.product_id],
+              bundle_quantity: s.bundles,
+              product_id: s.product_id,
+            })),
+          });
+        }
+        continue;
+      }
+
+      orderItems.push({
         product_id: line.productId,
         name: line.name,
-        price: unitPrices.get(unitBundles),
+        price: unitPrice,
         qty: line.qty,
         flavor: line.flavor,
         net_weight_grams: line.netWeightGrams,
         image: line.image,
-      };
-      if (line.selections) payload[COMBO_SELECTIONS_KEY] = line.selections;
-      orderItems.push(payload);
+      });
     }
 
     return { subtotal, orderItems };
