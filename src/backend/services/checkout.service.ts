@@ -564,6 +564,23 @@ export class CheckoutServiceImpl implements CheckoutService {
         `calculated subtotal=${subtotal}, discount=${discount}, tax=${tax}, shipping=${shipping}, total=${total} | ` +
         `items sent=${JSON.stringify(orderItems.map((i) => ({ p: i.product_id, qty: i.qty, price: i.price })))}`
       );
+
+      // The DB already created this order. Cancel it so a rejected checkout does not leave an
+      // unpaid "placed" order behind. Best effort: a failure here must not hide the real error.
+      try {
+        const orderService = container.resolve<OrderService>(ServiceTokens.OrderService);
+        const cancelRes = await orderService.cancelOrder(
+          createdOrder.id,
+          userId,
+          'Checkout rejected: stored total did not match calculated total'
+        );
+        if (!cancelRes.success) {
+          logger.error(`[CheckoutService] Could not cancel mismatched order ${createdOrder.id}: ${cancelRes.error.message}`);
+        }
+      } catch (cancelErr: any) {
+        logger.error(`[CheckoutService] Could not cancel mismatched order ${createdOrder.id}: ${cancelErr?.message || 'unknown error'}`);
+      }
+
       return failure(new ValidationError('Order total mismatch. Please try again.'));
     }
 
