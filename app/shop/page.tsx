@@ -61,11 +61,11 @@ async function fetchAllProducts(): Promise<Product[]> {
           flavour: String(p.flavor ?? ""),
           image: String(p.image ?? p.image_url ?? ""),
           description: String(p.description ?? ""),
-          price: `₹${Number(p.price ?? 640)}`,
-          offer: "12 × 40g Bundle",
-          offerDetails: "🎁 Pay for 10 + Get 2 FREE",
+          price: `₹${Number(p.price ?? 384)}`,
+          offer: "6 × 40g Bundle",
+          offerDetails: "",
           delivery: "🚚 Free Delivery",
-          netWeight: "480g",
+          netWeight: "240g",
         };
       });
   } catch {
