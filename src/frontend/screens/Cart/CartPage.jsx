@@ -40,6 +40,16 @@ export default function CartPage() {
   const progress = 100; // Always free shipping
   const remaining = 0;
 
+  // Calculate total packets in cart (each bundle = 6 packets)
+  const totalPackets = cartItems.reduce((sum, item) => {
+    // Each qty represents 1 bundle = 6 packets
+    return sum + (item.qty * 6);
+  }, 0);
+  
+  const isMultipleOfSix = totalPackets % 6 === 0;
+  const packetsToAdd = isMultipleOfSix ? 0 : 6 - (totalPackets % 6);
+  const packetsToRemove = isMultipleOfSix ? 0 : totalPackets % 6;
+
   const handleQty = useCallback((id, delta, curr, stock) => {
     const n = curr + delta;
     if (n < 1) return;
@@ -104,6 +114,23 @@ export default function CartPage() {
 
   const handleCheckout = () => {
     if (!cartItems.length) return;
+    
+    // Validate cart has multiple of 6 packets
+    if (!isMultipleOfSix) {
+      if (packetsToAdd > 0) {
+        toast.error(
+          `Please add ${packetsToAdd} more packet${packetsToAdd > 1 ? 's' : ''} (${Math.ceil(packetsToAdd / 6)} bundle${Math.ceil(packetsToAdd / 6) > 1 ? 's' : ''}) to proceed. Orders must be in multiples of 6 packets.`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.error(
+          `Please remove ${packetsToRemove} packet${packetsToRemove > 1 ? 's' : ''} to proceed. Orders must be in multiples of 6 packets.`,
+          { duration: 5000 }
+        );
+      }
+      return;
+    }
+    
     router.push("/checkout");
   };
 
@@ -265,6 +292,30 @@ export default function CartPage() {
               <button className={styles.checkoutBtn} onClick={handleCheckout}>
                 Proceed to Checkout <FiArrowRight />
               </button>
+
+              {/* Cart validation message */}
+              {!isMultipleOfSix && (
+                <div className={styles.validationMessage}>
+                  <FiPackage />
+                  <div>
+                    <strong>Cart contains {totalPackets} packet{totalPackets !== 1 ? 's' : ''}</strong>
+                    <p>
+                      {packetsToAdd > 0 
+                        ? `Add ${packetsToAdd} more packet${packetsToAdd > 1 ? 's' : ''} to proceed`
+                        : `Remove ${packetsToRemove} packet${packetsToRemove > 1 ? 's' : ''} to proceed`
+                      }
+                    </p>
+                    <small>Orders must be in multiples of 6 packets (1 bundle = 6 packets)</small>
+                  </div>
+                </div>
+              )}
+
+              {isMultipleOfSix && cartItems.length > 0 && (
+                <div className={styles.readyMessage}>
+                  <FiPackage />
+                  <span>✓ Cart ready! {totalPackets} packets ({totalPackets / 6} bundle{totalPackets / 6 > 1 ? 's' : ''})</span>
+                </div>
+              )}
 
               <div className={styles.trustRow}>
                 <span><FiShield /> Secure Payment</span>

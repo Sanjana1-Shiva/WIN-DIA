@@ -11,6 +11,7 @@ import { addToWishlist, removeFromWishlist } from "@/src/frontend/redux/slices/w
 import { supabase } from "@/src/frontend/lib/supabase/client";
 
 import { ProductCard } from "./ProductCard";
+import { ComboSelector } from "./ComboSelector";
 import { toStoreProduct, type Product, type ProductTheme } from "./productShared";
 
 import styles from "./GlutenFree.module.scss";
