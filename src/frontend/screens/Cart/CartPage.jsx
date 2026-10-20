@@ -28,27 +28,71 @@ export default function CartPage() {
   useEffect(() => {
     // Cart is hydrated by the Persistence component in providers.jsx (user-scoped).
     // Migration: Fix old combo product prices (₹1664 → ₹384)
-    const needsMigration = cartItems.some(item => {
+    let needsMigration = false;
+    let needsDeduplication = false;
+    
+    // Check for old prices
+    needsMigration = cartItems.some(item => {
       const isCombo = item.id === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
                       item.category === 'combo';
       return isCombo && item.price === 1664;
     });
     
-    if (needsMigration) {
-      const migratedCart = cartItems.map(item => {
+    // Check for duplicates (same cartId or id appearing multiple times)
+    const seenIds = new Set();
+    needsDeduplication = cartItems.some(item => {
+      const itemId = item.cartId || item._id || item.id;
+      if (seenIds.has(itemId)) {
+        return true; // Duplicate found
+      }
+      seenIds.add(itemId);
+      return false;
+    });
+    
+    if (needsMigration || needsDeduplication) {
+      const processedIds = new Map(); // Track items by their unique ID
+      
+      const migratedCart = cartItems.reduce((acc, item) => {
+        // Fix old pricing
         const isCombo = item.id === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
                         item.category === 'combo';
+        let processedItem = item;
+        
         if (isCombo && item.price === 1664) {
-          return {
+          processedItem = {
             ...item,
-            price: 384, // Correct price for 1 bundle (6 packets)
-            netWeight: 240, // 6 × 40g
+            price: 384,
+            netWeight: 240,
           };
         }
-        return item;
-      });
-      dispatch(setCart(migratedCart));
-      toast.success("Cart updated with new pricing!");
+        
+        // Deduplicate: merge items with same ID
+        const itemId = processedItem.cartId || processedItem._id || processedItem.id;
+        
+        if (processedIds.has(itemId)) {
+          // Duplicate found - merge quantities
+          const existing = processedIds.get(itemId);
+          existing.qty += processedItem.qty;
+        } else {
+          // New item - add to map
+          processedIds.set(itemId, { ...processedItem });
+        }
+        
+        return acc;
+      }, []);
+      
+      // Convert map back to array
+      const finalCart = Array.from(processedIds.values());
+      
+      if (finalCart.length !== cartItems.length || needsMigration) {
+        dispatch(setCart(finalCart));
+        if (needsDeduplication) {
+          toast.success("Cart cleaned up!");
+        }
+        if (needsMigration) {
+          toast.success("Cart updated with new pricing!");
+        }
+      }
     }
     
     setMounted(true);

@@ -7,7 +7,9 @@ const getUniqueComboId = (item) => {
   if (!item.flavorSelections) return getId(item);
   
   // Create a signature from the flavor selections
+  // Sort entries to ensure consistent ordering
   const signature = Object.entries(item.flavorSelections)
+    .filter(([_, count]) => count > 0) // Only include flavors with count > 0
     .sort(([a], [b]) => a.localeCompare(b)) // Sort for consistency
     .map(([flavor, count]) => `${flavor}:${count}`)
     .join('|');
@@ -49,8 +51,10 @@ const cartSlice = createSlice({
         });
         
         if (existing) {
+          // Item already exists, just increment quantity
           existing.qty += Number(item.qty || 1);
         } else {
+          // New item, add to cart
           s.cartItems.push(item);
         }
       },
