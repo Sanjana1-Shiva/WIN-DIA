@@ -356,11 +356,6 @@ export default function CheckoutPage() {
 
   const addrObj = addresses.find((a) => a._id === selectedAddr);
 
-  // Calculate total packets for validation (6-multiple check)
-  const totalPackets = checkoutItems.reduce((sum, item) => sum + (item.qty * 6), 0);
-  const isMultipleOfSix = totalPackets % 6 === 0;
-  const remainderPackets = totalPackets % 6;
-
   return (
     <div className={styles.page}>
 
