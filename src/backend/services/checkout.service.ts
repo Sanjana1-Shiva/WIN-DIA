@@ -345,11 +345,11 @@ export class CheckoutServiceImpl implements CheckoutService {
           kind: 'combo',
           productId,
           qty: 1,
-          bundles: COMBO_BUNDLES,
+          bundles: 1, // 1 bundle = 6 packets for combo
           name,
           flavor: null,
           image,
-          netWeightGrams: perPacketGrams * COMBO_BUNDLES * PACKETS_PER_BUNDLE,
+          netWeightGrams: perPacketGrams * COMBO_PACKETS, // 6 packets × 40g = 240g
           selections: selRes.value,
         });
         continue;
@@ -420,7 +420,7 @@ export class CheckoutServiceImpl implements CheckoutService {
     const orderItems: Record<string, unknown>[] = [];
 
     for (const line of lines) {
-      const unitBundles = line.kind === 'combo' ? COMBO_BUNDLES : 1;
+      const unitBundles = line.kind === 'combo' ? 1 : 1; // Combo is 1 bundle now
       if (!unitPrices.has(unitBundles)) unitPrices.set(unitBundles, await this.getDbPrice(unitBundles));
 
       const payload: Record<string, unknown> = {
