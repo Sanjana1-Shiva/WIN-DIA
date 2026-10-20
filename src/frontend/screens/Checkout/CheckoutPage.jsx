@@ -578,9 +578,40 @@ export default function CheckoutPage() {
                 {checkoutItems.map((item) => (
                   <div key={item._id || item.id} className={styles.summaryItem}>
                     <img src={item.image || "/images/product-methi.jpg"} alt={item.name} />
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <p className={styles.sItemName}>{item.name}</p>
                       <p className={styles.sItemQty}>× {item.qty}</p>
+                      
+                      {/* Combo Flavor Breakdown */}
+                      {item.flavorSelections && (
+                        <div style={{ 
+                          background: 'rgba(201,168,76,0.08)', 
+                          border: '1px solid rgba(201,168,76,0.25)', 
+                          borderRadius: '4px', 
+                          padding: '6px 8px', 
+                          marginTop: '6px',
+                          fontSize: '0.7rem'
+                        }}>
+                          <p style={{ fontWeight: 700, marginBottom: '4px', color: '#3B1F0F' }}>📦 Combo Contents:</p>
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {Object.entries(item.flavorSelections)
+                              .filter(([_, count]) => count > 0)
+                              .map(([flavorId, count]) => {
+                                const flavorNames = {
+                                  'curry-leaves': 'Curry Leaves',
+                                  'garlic': 'Garlic',
+                                  'jeera': 'Jeera',
+                                  'onion': 'Onion'
+                                };
+                                return (
+                                  <li key={flavorId} style={{ color: '#6B5948' }}>
+                                    <strong style={{ color: '#3B1F0F' }}>{flavorNames[flavorId]}</strong>: {count} × 40g
+                                  </li>
+                                );
+                              })}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                     <span className={styles.sItemPrice}>₹{(item.price * item.qty).toFixed(0)}</span>
                   </div>

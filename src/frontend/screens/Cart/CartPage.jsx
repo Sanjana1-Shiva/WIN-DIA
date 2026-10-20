@@ -206,6 +206,30 @@ export default function CartPage() {
                       {item.flavor && <p className={styles.itemFlavor}>{item.flavor}</p>}
                       {item.netWeight && <p className={styles.itemWeight}>{item.netWeight}g</p>}
 
+                      {/* Combo Flavor Breakdown */}
+                      {item.flavorSelections && (
+                        <div className={styles.flavorBreakdown}>
+                          <p className={styles.flavorBreakdownTitle}>📦 Your Combo Selection:</p>
+                          <ul className={styles.flavorList}>
+                            {Object.entries(item.flavorSelections)
+                              .filter(([_, count]) => count > 0)
+                              .map(([flavorId, count]) => {
+                                const flavorNames = {
+                                  'curry-leaves': 'Curry Leaves',
+                                  'garlic': 'Garlic',
+                                  'jeera': 'Jeera',
+                                  'onion': 'Onion'
+                                };
+                                return (
+                                  <li key={flavorId}>
+                                    <strong>{flavorNames[flavorId] || flavorId}:</strong> {count} packet{count > 1 ? 's' : ''} ({count * 40}g)
+                                  </li>
+                                );
+                              })}
+                          </ul>
+                        </div>
+                      )}
+
                       <div className={styles.itemBadges}>
                         {item.isLowGI && <span className={styles.badge}>Low GI</span>}
                         {item.isGlutenFree && <span className={styles.badge}>Gut Healthy</span>}

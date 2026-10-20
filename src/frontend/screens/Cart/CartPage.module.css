@@ -156,3 +156,52 @@
   flex-shrink: 0;
   font-size: 1.1rem;
 }
+
+
+/* Flavor Breakdown for Combo */
+.flavorBreakdown {
+  background: rgba(201, 168, 76, 0.08);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+
+.flavorBreakdownTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--coco);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flavorList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flavorList li {
+  font-size: 0.8rem;
+  color: var(--coco-light);
+  padding-left: 16px;
+  position: relative;
+}
+
+.flavorList li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  color: var(--gold);
+  font-weight: bold;
+}
+
+.flavorList li strong {
+  color: var(--coco);
+  font-weight: 600;
+}
