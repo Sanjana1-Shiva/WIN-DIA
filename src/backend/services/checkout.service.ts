@@ -239,7 +239,7 @@ export class CheckoutServiceImpl implements CheckoutService {
     // If flavorSelections is an object (e.g. { "curry-leaves": 2, "garlic": 1 }), convert to array format
     if (!raw && item?.flavorSelections) {
       raw = Object.entries(item.flavorSelections)
-        .filter(([_, count]) => count > 0)
+        .filter(([_, count]) => (count as number) > 0)
         .map(([flavorKey, count]) => {
           // Map flavor keys to product IDs
           const flavorToProductId: Record<string, string> = {
@@ -250,7 +250,7 @@ export class CheckoutServiceImpl implements CheckoutService {
           };
           return {
             productId: flavorToProductId[flavorKey] || flavorKey,
-            bundles: count,
+            bundles: count as number,
           };
         });
     }
