@@ -91,6 +91,13 @@ export function ProductRange({ heading, headingId, products, theme }: ProductRan
   const handleComboConfirm = (selections: Record<string, number>) => {
     if (!selectedComboProduct) return;
 
+    // Validate selections exist
+    const totalSelected = Object.values(selections).reduce((sum, count) => sum + count, 0);
+    if (totalSelected !== 6) {
+      toast.error("Please select exactly 6 packets");
+      return;
+    }
+
     // Create combo product with selections
     const comboData = {
       ...toStoreProduct(selectedComboProduct, theme),

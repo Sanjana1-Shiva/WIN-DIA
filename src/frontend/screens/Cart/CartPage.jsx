@@ -38,60 +38,70 @@ export default function CartPage() {
       return isCombo && item.price === 1664;
     });
     
-    // Check for duplicates (same cartId or id appearing multiple times)
-    const seenIds = new Set();
-    needsDeduplication = cartItems.some(item => {
-      const itemId = item.cartId || item._id || item.id;
-      if (seenIds.has(itemId)) {
-        return true; // Duplicate found
+    // Check for duplicates - more aggressive check for combo products
+    const seenIds = new Map(); // Map to track by base product ID
+    const duplicateIndices = new Set();
+    
+    cartItems.forEach((item, index) => {
+      const baseId = item._id || item.id;
+      const isCombo = baseId === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
+                      item.category === 'combo';
+      
+      if (isCombo) {
+        // For combo products, check if we've seen this base ID
+        if (seenIds.has(baseId)) {
+          // Check if they have the same flavor selections
+          const existing = seenIds.get(baseId);
+          const existingSelections = JSON.stringify(existing.item.flavorSelections || {});
+          const currentSelections = JSON.stringify(item.flavorSelections || {});
+          
+          if (existingSelections === currentSelections || !item.flavorSelections) {
+            // Same selections or no selections on current item = duplicate
+            duplicateIndices.add(index);
+            needsDeduplication = true;
+          } else {
+            // Different selections - both valid, update map with newer one
+            seenIds.set(`${baseId}_${currentSelections}`, { item, index });
+          }
+        } else {
+          seenIds.set(baseId, { item, index });
+        }
+      } else {
+        // Regular products - simple duplicate check by ID
+        const itemId = item.cartId || baseId;
+        if (seenIds.has(itemId)) {
+          duplicateIndices.add(index);
+          needsDeduplication = true;
+        } else {
+          seenIds.set(itemId, { item, index });
+        }
       }
-      seenIds.add(itemId);
-      return false;
     });
     
     if (needsMigration || needsDeduplication) {
-      const processedIds = new Map(); // Track items by their unique ID
+      let migratedCart = cartItems
+        .filter((_, index) => !duplicateIndices.has(index)) // Remove duplicates
+        .map(item => {
+          // Fix old pricing
+          const isCombo = item.id === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
+                          item.category === 'combo';
+          
+          if (isCombo && item.price === 1664) {
+            return {
+              ...item,
+              price: 384,
+              netWeight: 240,
+            };
+          }
+          return item;
+        });
       
-      const migratedCart = cartItems.reduce((acc, item) => {
-        // Fix old pricing
-        const isCombo = item.id === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
-                        item.category === 'combo';
-        let processedItem = item;
-        
-        if (isCombo && item.price === 1664) {
-          processedItem = {
-            ...item,
-            price: 384,
-            netWeight: 240,
-          };
-        }
-        
-        // Deduplicate: merge items with same ID
-        const itemId = processedItem.cartId || processedItem._id || processedItem.id;
-        
-        if (processedIds.has(itemId)) {
-          // Duplicate found - merge quantities
-          const existing = processedIds.get(itemId);
-          existing.qty += processedItem.qty;
-        } else {
-          // New item - add to map
-          processedIds.set(itemId, { ...processedItem });
-        }
-        
-        return acc;
-      }, []);
+      dispatch(setCart(migratedCart));
       
-      // Convert map back to array
-      const finalCart = Array.from(processedIds.values());
-      
-      if (finalCart.length !== cartItems.length || needsMigration) {
-        dispatch(setCart(finalCart));
-        if (needsDeduplication) {
-          toast.success("Cart cleaned up!");
-        }
-        if (needsMigration) {
-          toast.success("Cart updated with new pricing!");
-        }
+      if (needsDeduplication) {
+        toast.success("Removed duplicate items from cart!");
+      } else if (needsMigration) {
+        toast.success("Cart updated with new pricing!");
       }
     }
     
