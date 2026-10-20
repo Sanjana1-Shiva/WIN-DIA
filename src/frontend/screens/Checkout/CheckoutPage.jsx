@@ -219,6 +219,18 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     if (placing) return;
+    
+    // Block if not 6-multiple
+    if (!isMultipleOfSix) {
+      const remainderPackets = totalPackets % 6;
+      if (remainderPackets < 3) {
+        toast.error(`Remove ${remainderPackets} packet${remainderPackets > 1 ? 's' : ''} or add ${6 - remainderPackets} more to proceed (orders must be 6-packet multiples)`);
+      } else {
+        toast.error(`Add ${6 - remainderPackets} more packet${6 - remainderPackets > 1 ? 's' : ''} or remove ${remainderPackets} to proceed (orders must be 6-packet multiples)`);
+      }
+      return;
+    }
+    
     if (!user) {
       toast.error("Please login before placing the order");
       router.push("/login?next=/checkout");
@@ -329,8 +341,33 @@ export default function CheckoutPage() {
 
   const addrObj = addresses.find((a) => a._id === selectedAddr);
 
+  // Calculate total packets for validation (6-multiple check)
+  const totalPackets = checkoutItems.reduce((sum, item) => sum + (item.qty * 6), 0);
+  const isMultipleOfSix = totalPackets % 6 === 0;
+  const remainderPackets = totalPackets % 6;
+
   return (
     <div className={styles.page}>
+
+      {/* ── 6-Multiple Validation Banner ── */}
+      {!isMultipleOfSix && (
+        <div style={{
+          backgroundColor: '#fff3cd',
+          borderBottom: '2px solid #ffc107',
+          padding: '16px',
+          textAlign: 'center',
+          color: '#856404',
+          fontWeight: 600,
+          fontSize: '15px'
+        }}>
+          ⚠️ Orders must be in multiples of 6 packets. 
+          {remainderPackets < 3 ? (
+            <span> Please remove <strong>{remainderPackets} packet{remainderPackets > 1 ? 's' : ''}</strong> or add <strong>{6 - remainderPackets} more packet{6 - remainderPackets > 1 ? 's' : ''}</strong> to proceed with payment.</span>
+          ) : (
+            <span> Please add <strong>{6 - remainderPackets} more packet{6 - remainderPackets > 1 ? 's' : ''}</strong> or remove <strong>{remainderPackets} packet{remainderPackets > 1 ? 's' : ''}</strong> to proceed with payment.</span>
+          )}
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className={styles.header}>
@@ -517,7 +554,12 @@ export default function CheckoutPage() {
                   </div>
                   <div className={styles.stepFooter}>
                     <button className={styles.backBtn2} onClick={() => setStep(1)}><FiArrowLeft /> Back</button>
-                    <button className={styles.proceedBtn} onClick={handlePlaceOrder} disabled={placing}>
+                    <button 
+                      className={styles.proceedBtn} 
+                      onClick={handlePlaceOrder} 
+                      disabled={placing || !isMultipleOfSix}
+                      style={!isMultipleOfSix ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    >
                       {placing ? <><FiLoader className="spin" /> Placing Order...</> : <>Place Order <FiChevronRight /></>}
                     </button>
                   </div>
