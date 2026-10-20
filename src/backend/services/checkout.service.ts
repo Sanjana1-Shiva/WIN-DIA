@@ -557,7 +557,13 @@ export class CheckoutServiceImpl implements CheckoutService {
     // Fail closed if the DB stored a different total than the one we priced.
     const storedTotal = Number(createdOrder.total_price);
     if (Number.isFinite(storedTotal) && Math.round(storedTotal * 100) !== Math.round(total * 100)) {
-      logger.error(`[CheckoutService] Stored total differs from calculated total for order ${createdOrder.id}`);
+      logger.error(
+        `[CheckoutService] Stored total differs from calculated total for order ${createdOrder.id}: ` +
+        `stored items_price=${(createdOrder as any).items_price}, discount=${(createdOrder as any).discount_price}, ` +
+        `tax=${(createdOrder as any).tax_price}, shipping=${(createdOrder as any).shipping_price}, total=${storedTotal} | ` +
+        `calculated subtotal=${subtotal}, discount=${discount}, tax=${tax}, shipping=${shipping}, total=${total} | ` +
+        `items sent=${JSON.stringify(orderItems.map((i) => ({ p: i.product_id, qty: i.qty, price: i.price })))}`
+      );
       return failure(new ValidationError('Order total mismatch. Please try again.'));
     }
 
