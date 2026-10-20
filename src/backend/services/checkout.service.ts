@@ -42,7 +42,7 @@ export interface CheckoutService {
 // calculate_windia_price is the only source of truth.
 // ---------------------------------------------------------------------
 const PACKETS_PER_BUNDLE = 6;
-const COMBO_BUNDLES = 6; // one assorted combo = 6 bundles = 36 packets
+const COMBO_PACKETS = 6; // one assorted combo = 6 packets (1 bundle)
 
 const COMBO_PRODUCT_ID = '9d17cedd-4abd-4765-af1e-f368d17bad32';
 
@@ -233,7 +233,28 @@ export class CheckoutServiceImpl implements CheckoutService {
    * unavailable flavours never selected; repeats allowed.
    */
   private validateComboSelections(item: any, available: Set<string>): Result<ComboSelection[], AppError> {
-    const raw = item?.combo_selections ?? item?.comboSelections ?? item?.selections;
+    // Accept flavorSelections (object format from frontend) or combo_selections/comboSelections (array format)
+    let raw = item?.combo_selections ?? item?.comboSelections ?? item?.selections;
+    
+    // If flavorSelections is an object (e.g. { "curry-leaves": 2, "garlic": 1 }), convert to array format
+    if (!raw && item?.flavorSelections) {
+      raw = Object.entries(item.flavorSelections)
+        .filter(([_, count]) => count > 0)
+        .map(([flavorKey, count]) => {
+          // Map flavor keys to product IDs
+          const flavorToProductId: Record<string, string> = {
+            'curry-leaves': '0b225519-b378-4e45-bc13-5bfa41459c81',
+            'garlic': 'f30e1bc4-a532-42b2-b59a-3244521c4ce6',
+            'jeera': 'dca9fd97-c09d-44f2-8af7-b02c0670593c',
+            'onion': 'c640d38c-2422-4082-a132-99d393648f21',
+          };
+          return {
+            productId: flavorToProductId[flavorKey] || flavorKey,
+            bundles: count,
+          };
+        });
+    }
+    
     if (!Array.isArray(raw) || raw.length === 0) {
       return failure(new ValidationError('Please choose the flavours for your assorted combo.'));
     }
@@ -264,8 +285,8 @@ export class CheckoutServiceImpl implements CheckoutService {
     }
 
     const total = Array.from(counts.values()).reduce((s, n) => s + n, 0);
-    if (total !== COMBO_BUNDLES) {
-      return failure(new ValidationError(`An assorted combo must have exactly ${COMBO_BUNDLES} bundles selected.`));
+    if (total !== COMBO_PACKETS) {
+      return failure(new ValidationError(`An assorted combo must have exactly ${COMBO_PACKETS} packets selected.`));
     }
     for (const id of available) {
       if (!counts.has(id)) {

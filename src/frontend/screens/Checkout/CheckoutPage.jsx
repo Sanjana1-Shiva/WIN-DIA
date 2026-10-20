@@ -298,6 +298,8 @@ export default function CheckoutPage() {
             qty: i.qty,
             flavor: i.flavor,
             netWeight: i.netWeight,
+            // Include flavor selections for combo products
+            ...(i.flavorSelections && { flavorSelections: i.flavorSelections }),
           })),
           shippingAddress: { name: addr.name || addr.full_name, phone: addr.phone, street: addr.street || addr.address_line1, city: addr.city, state: addr.state, pincode: addr.pincode },
           paymentMethod: payMethod, orderNotes: notes,
