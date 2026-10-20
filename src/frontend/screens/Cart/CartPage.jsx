@@ -239,7 +239,10 @@ export default function CartPage() {
           <div className={styles.itemsCol}>
             <AnimatePresence>
               {cartItems.map((item) => {
-                const id = item._id || item.id;
+                // Use cartId for combo products with flavor selections, otherwise use standard id
+                const id = item.cartId || item._id || item.id;
+                // For links, always use the actual product ID
+                const productId = item._id || item.id;
                 return (
                   <motion.div
                     key={id}
@@ -249,12 +252,12 @@ export default function CartPage() {
                     exit={{ opacity: 0, x: -40, height: 0, marginBottom: 0 }}
                     layout
                   >
-                    <Link href={`/product/${id}`} className={styles.itemImg}>
+                    <Link href={`/product/${productId}`} className={styles.itemImg}>
                       <img src={item.image || "/images/product-methi.jpg"} alt={item.name} />
                     </Link>
 
                     <div className={styles.itemInfo}>
-                      <Link href={`/product/${id}`} className={styles.itemName}>{item.name}</Link>
+                      <Link href={`/product/${productId}`} className={styles.itemName}>{item.name}</Link>
                       {item.flavor && <p className={styles.itemFlavor}>{item.flavor}</p>}
                       {item.netWeight && <p className={styles.itemWeight}>{item.netWeight}g</p>}
 
