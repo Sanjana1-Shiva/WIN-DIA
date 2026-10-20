@@ -23,6 +23,18 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
+    const isCod = body.paymentMethod === 'cod' || body.payment_method === 'cod';
+
+    // Fail early (before an order is created) if Razorpay isn't configured.
+    const env = getEnv();
+    const razorpayKeyId = env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
+    if (!isCod && !razorpayKeyId) {
+      return NextResponse.json(
+        createErrorResponse('INTERNAL_SERVER_ERROR', 'Payment is not configured'),
+        { status: 500 }
+      );
+    }
+
     const checkoutService = authRes.value.scope.resolve<CheckoutService>(ServiceTokens.CheckoutService);
 
     const result = await checkoutService.processCheckout(authRes.value.id, body);
@@ -30,10 +42,7 @@ export async function POST(request: Request) {
       return handleServiceResult(result);
     }
 
-    const { order, items, payment, razorpayOrderId, pricing } = result.value;
-    const isCod = body.paymentMethod === 'cod' || body.payment_method === 'cod';
-    const env = getEnv();
-    const razorpayKeyId = env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const { order, items, razorpayOrderId, pricing } = result.value;
 
     const legacyPayload = {
       success: true,

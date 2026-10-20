@@ -24,12 +24,12 @@ export class ShipmentServiceImpl implements ShipmentService {
     this.eventRepo = eventRepo || container.resolve<ShipmentTrackingEventRepository>(RepositoryTokens.ShipmentTrackingEventRepository);
   }
 
-  public async createShipmentPlaceholder(orderId: string, courierName?: string): Promise<Result<Shipment, AppError>> {
+    public async createShipmentPlaceholder(orderId: string, courierName?: string): Promise<Result<Shipment, AppError>> {
     logger.info(`[ShipmentService.createShipmentPlaceholder] Creating shipment placeholder for order ${orderId}`);
     return this.shipmentRepo.create({
       order_id: orderId,
-      provider: 'shiprocket',
-      courier_name: courierName || 'Shiprocket',
+      provider: 'dtdc',
+      courier_name: courierName || 'DTDC',
       status: 'created' as ShipmentStatus,
       raw_response: {},
     } as Partial<Shipment>);

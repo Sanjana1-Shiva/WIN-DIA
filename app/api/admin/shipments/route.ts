@@ -5,7 +5,7 @@ import { ShipmentService } from '@/src/backend/services/shipment.service';
 import { getAdminUserContext, handleServiceResult } from '@/src/backend/utils/route-helper.util';
 import { createErrorResponse } from '@/src/backend/types/api-response.types';
 import { getAdminClient } from '@/src/backend/config/supabase.config';
-import { shiprocketProvider } from '@/src/backend/lib/shiprocket';
+import { dtdcProvider } from '@/src/backend/lib/dtdc';
 
 export const runtime = 'nodejs';
 
@@ -62,8 +62,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create shipment via Shiprocket
-    const result = await shiprocketProvider.createShipment({
+    // Create shipment via dtdc
+    const result = await dtdcProvider.createShipment({
       orderId: order.id,
       orderNumber: order.order_number,
       shippingAddress: order.shipping_address || {},
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     // Update shipments table
     await client.from('shipments').upsert({
       order_id: order.id,
-      provider: 'shiprocket',
+      provider: 'dtdc',
       awb_code: result.awbCode || null,
       courier_name: result.courierName || null,
       status: result.success ? 'created' : 'failed',
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     await client.from('orders').update({
       awb_code: result.awbCode || null,
       courier_name: result.courierName || null,
-      shipping_provider: 'shiprocket',
+      shipping_provider: 'dtdc',
       order_status: 'processing',
       updated_at: new Date().toISOString(),
     }).eq('id', order.id);
@@ -163,7 +163,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const trackResult = await shiprocketProvider.trackShipment(order.awb_code);
+    const trackResult = await dtdcProvider.trackShipment(order.awb_code);
 
     return NextResponse.json({
       success: true,

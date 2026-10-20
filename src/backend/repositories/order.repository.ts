@@ -71,116 +71,16 @@ export class SupabaseOrderRepository
   }
 
   /**
-   * Inserts the order row.
+   * Single database transaction via create_checkout_order_transaction.
+   * The DB creates the order (and generates the order number), order items, combo selections,
+   * shipment, and the COD payment record where applicable. Do NOT pass an order_number, and do
+   * not insert any of these rows from application code.
+   *
+   * ASSUMPTION — CONFIRM WITH DB OWNER: the argument names below (p_user_id, p_order_data,
+   * p_items, p_payment_data, p_shipment_data). Supabase RPC needs the exact names; they are
+   * visible in the function definition. The returned JSON is expected to look like
+   * { order, items, payment, shipment } — confirm that too.
    */
-  private async insertOrder(
-    client: SupabaseClient,
-    userId: string,
-    orderData: Record<string, unknown>
-  ) {
-    return client
-      .from('orders')
-      .insert({
-        order_number: orderData.order_number || `WIN-${Date.now()}`,
-        user_id: userId,
-        order_status: orderData.order_status || 'placed',
-        payment_status: orderData.payment_status || 'pending',
-        payment_method: orderData.payment_method || 'razorpay',
-        items_price: Number(orderData.items_price || 0),
-        discount_price: Number(orderData.discount_price || 0),
-        tax_price: Number(orderData.tax_price || 0),
-        shipping_price: Number(orderData.shipping_price || 0),
-        total_price: Number(orderData.total_price || 0),
-        shipping_address: orderData.shipping_address || {},
-        order_notes: orderData.order_notes || null,
-      })
-      .select('*')
-      .single();
-  }
-
-  /**
-   * Inserts the order_items rows for a given order.
-   */
-  private async insertOrderItems(
-    client: SupabaseClient,
-    orderId: string,
-    orderItems: Record<string, unknown>[]
-  ) {
-    const itemsPayload = orderItems.map((item) => ({
-      order_id: orderId,
-      product_id: item.product_id,
-      name: item.name,
-      price: Number(item.price || 0),
-      qty: Number(item.qty || 1),
-      flavor: item.flavor || null,
-      net_weight_grams: item.net_weight_grams || null,
-      image: item.image || null,
-    }));
-
-    return client.from('order_items').insert(itemsPayload).select('*');
-  }
-
-  /**
-   * Inserts the shipment row for a given order.
-   */
-  private async insertShipment(
-    client: SupabaseClient,
-    orderId: string,
-    shipmentData: Record<string, unknown>
-  ) {
-    return client
-      .from('shipments')
-      .insert({
-        order_id: orderId,
-        provider: 'shiprocket',
-        courier_name: shipmentData.courier_name || 'Shiprocket',
-        status: shipmentData.status || 'created',
-        raw_response: {},
-      })
-      .select('*')
-      .single();
-  }
-
-  /**
-   * Inserts a pending COD payment row for a given order.
-   */
-  private async insertCodPayment(
-    client: SupabaseClient,
-    orderId: string,
-    paymentData: Record<string, unknown>
-  ) {
-    return client
-      .from('payments')
-      .insert({
-        order_id: orderId,
-        payment_provider: 'cod',
-        transaction_id: null,
-        provider_order_id: null,
-        amount: Number(paymentData.amount || 0),
-        currency: paymentData.currency || 'INR',
-        status: 'pending',
-        payment_method: 'cod',
-        raw_response: {},
-      })
-      .select('*')
-      .single();
-  }
-
-  /**
-   * Deletes any rows already created for this checkout attempt, in dependency order.
-   */
-  private async rollbackCheckout(
-    client: SupabaseClient,
-    orderId: string,
-    options: { shipmentId?: string } = {}
-  ): Promise<void> {
-    if (options.shipmentId) {
-      await client.from('shipments').delete().eq('id', options.shipmentId);
-    }
-    await client.from('order_items').delete().eq('order_id', orderId);
-    await client.from('orders').delete().eq('id', orderId);
-  }
-
   public async createCheckoutTransaction(
     userId: string,
     orderData: Record<string, unknown>,
@@ -189,39 +89,26 @@ export class SupabaseOrderRepository
     shipmentData: Record<string, unknown>
   ): Promise<Result<Record<string, unknown>, AppError>> {
     try {
-      // The live WIN-DIA database uses the legacy orders/order_items schema.
-      // Keep checkout compatible with it instead of calling the newer RPC,
-      // whose shipment columns do not exist in the deployed database.
       const client = getAdminClient();
 
-      const { data: order, error: orderError } = await this.insertOrder(client, userId, orderData);
-      if (orderError || !order) {
-        return failure(this.handleError(orderError || new Error('Order was not created'), 'createCheckoutTransaction'));
+      const { data, error } = await client.rpc('create_checkout_order_transaction', {
+        p_user_id: userId,
+        p_order_data: orderData,
+        p_items: orderItems,
+        p_payment_data: paymentData,
+        p_shipment_data: shipmentData,
+      });
+
+      if (error) {
+        return failure(this.handleError(error, 'createCheckoutTransaction'));
       }
 
-      const { data: items, error: itemsError } = await this.insertOrderItems(client, order.id, orderItems);
-      if (itemsError) {
-        await this.rollbackCheckout(client, order.id);
-        return failure(this.handleError(itemsError, 'createCheckoutTransaction'));
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result || typeof result !== 'object') {
+        return failure(this.handleError(new Error('Checkout RPC returned no data'), 'createCheckoutTransaction'));
       }
 
-      const { data: shipment, error: shipmentError } = await this.insertShipment(client, order.id, shipmentData);
-      if (shipmentError) {
-        await this.rollbackCheckout(client, order.id);
-        return failure(this.handleError(shipmentError, 'createCheckoutTransaction'));
-      }
-
-      let payment: Record<string, unknown> | null = null;
-      if (paymentData.payment_method === 'cod') {
-        const { data: codPayment, error: paymentError } = await this.insertCodPayment(client, order.id, paymentData);
-        if (paymentError) {
-          await this.rollbackCheckout(client, order.id, { shipmentId: shipment.id });
-          return failure(this.handleError(paymentError, 'createCheckoutTransaction'));
-        }
-        payment = codPayment as Record<string, unknown>;
-      }
-
-      return success({ order, items: items || [], payment, shipment });
+      return success(result as Record<string, unknown>);
     } catch (err) {
       return failure(this.handleError(err, 'createCheckoutTransaction'));
     }

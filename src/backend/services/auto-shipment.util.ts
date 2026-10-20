@@ -1,7 +1,7 @@
 import { container, RepositoryTokens } from '../providers/container.provider';
 import { OrderRepository } from '../repositories/order.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
-import { shiprocketProvider } from '../lib/shiprocket';
+import { dtdcProvider } from '../lib/dtdc';
 import { getAdminClient } from '../config/supabase.config';
 import { logger } from '../utils/logger.util';
 
@@ -42,7 +42,7 @@ export async function autoBookShipment(orderId: string, logPrefix = '[auto-shipm
       return;
     }
 
-    const result = await shiprocketProvider.createShipment({
+    const result = await dtdcProvider.createShipment({
       orderId: order.id,
       orderNumber: order.order_number,
       shippingAddress: order.shipping_address || {},
@@ -60,7 +60,7 @@ export async function autoBookShipment(orderId: string, logPrefix = '[auto-shipm
     const client = getAdminClient();
     await client.from('shipments').upsert({
       order_id: order.id,
-      provider: 'shiprocket',
+      provider: 'dtdc',
       awb_code: result.awbCode || null,
       courier_name: result.courierName || null,
       status: result.success ? 'created' : 'failed',
@@ -69,14 +69,14 @@ export async function autoBookShipment(orderId: string, logPrefix = '[auto-shipm
     }, { onConflict: 'order_id' });
 
     if (!result.success) {
-      logger.error(`${logPrefix} Shiprocket shipment creation failed for order ${orderId}: ${result.error}`);
+      logger.error(`${logPrefix} dtdc shipment creation failed for order ${orderId}: ${result.error}`);
       return;
     }
 
     await client.from('orders').update({
       awb_code: result.awbCode || null,
       courier_name: result.courierName || null,
-      shipping_provider: 'shiprocket',
+      shipping_provider: 'dtdc',
       order_status: 'processing',
       updated_at: new Date().toISOString(),
     }).eq('id', order.id);
