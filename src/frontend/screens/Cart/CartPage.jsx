@@ -27,7 +27,30 @@ export default function CartPage() {
 
   useEffect(() => {
     // Cart is hydrated by the Persistence component in providers.jsx (user-scoped).
-    // No need to re-hydrate from localStorage here.
+    // Migration: Fix old combo product prices (₹1664 → ₹384)
+    const needsMigration = cartItems.some(item => {
+      const isCombo = item.id === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
+                      item.category === 'combo';
+      return isCombo && item.price === 1664;
+    });
+    
+    if (needsMigration) {
+      const migratedCart = cartItems.map(item => {
+        const isCombo = item.id === '9d17cedd-4abd-4765-af1e-f368d17bad32' || 
+                        item.category === 'combo';
+        if (isCombo && item.price === 1664) {
+          return {
+            ...item,
+            price: 384, // Correct price for 1 bundle (6 packets)
+            netWeight: 240, // 6 × 40g
+          };
+        }
+        return item;
+      });
+      dispatch(setCart(migratedCart));
+      toast.success("Cart updated with new pricing!");
+    }
+    
     setMounted(true);
   }, []);
 
