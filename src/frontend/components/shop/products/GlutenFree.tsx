@@ -38,11 +38,23 @@ export function ProductRange({ heading, headingId, products, theme }: ProductRan
     Object.fromEntries(products.map((p) => [p.id, 0]))
   );
   
+  // Combo selector state
+  const [comboModalOpen, setComboModalOpen] = useState(false);
+  const [selectedComboProduct, setSelectedComboProduct] = useState<Product | null>(null);
+  
   // Create a Set of wishlisted IDs from Redux store for efficient lookup
   const wishlistedIds = useMemo(() => 
     new Set(wishlistItems.map((item: any) => item.id || item._id)),
     [wishlistItems]
   );
+
+  // Available flavors for combo selector (hardcoded for now, should come from DB)
+  const availableFlavors = useMemo(() => [
+    { id: "jeera", name: "Jeera", available: true, stock: 100 },
+    { id: "garlic", name: "Garlic", available: true, stock: 100 },
+    { id: "onion", name: "Onion", available: true, stock: 100 },
+    { id: "curry-leaf", name: "Curry Leaves", available: true, stock: 100 },
+  ], []);
 
   const requireAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -54,6 +66,18 @@ export function ProductRange({ heading, headingId, products, theme }: ProductRan
   };
 
   const setQuantity = async (product: Product, next: number) => {
+    // Check if this is a combo product
+    const isCombo = theme === "combo" || product.id === "assorted-combo";
+    
+    if (isCombo && next > 0) {
+      // Open combo selector modal instead of directly adding to cart
+      if (!(await requireAuth())) return;
+      setSelectedComboProduct(product);
+      setComboModalOpen(true);
+      return;
+    }
+
+    // Regular product logic
     const nextQuantity = Math.max(0, next);
     const current = quantities[product.id] ?? 0;
     if (nextQuantity > current) {
@@ -62,6 +86,29 @@ export function ProductRange({ heading, headingId, products, theme }: ProductRan
       toast.success("Added to cart");
     }
     setQuantities((q) => ({ ...q, [product.id]: nextQuantity }));
+  };
+
+  const handleComboConfirm = (selections: Record<string, number>) => {
+    if (!selectedComboProduct) return;
+
+    // Create combo product with selections
+    const comboData = {
+      ...toStoreProduct(selectedComboProduct, theme),
+      comboSelections: selections,
+      // Add flavor breakdown to display name
+      flavorBreakdown: Object.entries(selections)
+        .filter(([_, count]) => count > 0)
+        .map(([flavorId, count]) => {
+          const flavor = availableFlavors.find(f => f.id === flavorId);
+          return `${flavor?.name} x${count}`;
+        })
+        .join(", "),
+    };
+
+    dispatch(addToCart(comboData, 1));
+    toast.success("Combo added to cart with your custom selection!");
+    setComboModalOpen(false);
+    setSelectedComboProduct(null);
   };
 
   const toggleWishlist = async (product: Product) => {
@@ -101,6 +148,17 @@ export function ProductRange({ heading, headingId, products, theme }: ProductRan
           );
         })}
       </ul>
+
+      {/* Combo Selector Modal */}
+      <ComboSelector
+        isOpen={comboModalOpen}
+        onClose={() => {
+          setComboModalOpen(false);
+          setSelectedComboProduct(null);
+        }}
+        onConfirm={handleComboConfirm}
+        availableFlavors={availableFlavors}
+      />
     </section>
   );
 }
