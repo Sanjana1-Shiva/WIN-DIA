@@ -52,115 +52,26 @@ export default function CheckoutPage() {
 
   const [form, setForm] = useState({ type: "home", name: "", street: "", city: "", state: "Karnataka", pincode: "", phone: "", isDefault: false });
 
-  // Handle coupon application
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) {
-      toast.error("Please enter a coupon code");
-      return;
-    }
-    
-    setCouponLoading(true);
-    try {
-      const res = await fetch("/api/coupons/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: couponCode.trim(),
-          cart_total: subtotal,
-        }),
-      });
-      
-      const data = await res.json();
-      
-      if (data.success) {
-        setCouponApplied(true);
-        dispatch(setPromoApplied(true)); // Save to Redux
-        dispatch(setPromoCode(couponCode.trim())); // Save code to Redux
-        toast.success(`Coupon applied! You saved ₹${data.data.discount_amount.toFixed(0)}`);
-      } else {
-        toast.error(data.error || "Invalid coupon code");
-      }
-    } catch (error) {
-      toast.error("Failed to apply coupon");
-    } finally {
-      setCouponLoading(false);
-    }
+  // Helper function to calculate bundle price
+  const getBundlePrice = (bundles) => {
+    if (bundles === 1) return 384;
+    if (bundles === 2) return 640;
+    if (bundles === 3) return 896;
+    if (bundles === 4) return 1152;
+    if (bundles === 5) return 1408;
+    if (bundles >= 6) return 1664 + ((bundles - 6) * 256);
+    return 0;
   };
 
-  const handleRemoveCoupon = () => {
-    setCouponApplied(false);
-    setCouponCode("");
-    dispatch(setPromoApplied(false)); // Clear from Redux
-    dispatch(setPromoCode("")); // Clear code from Redux
-    toast.success("Coupon removed");
-  };
-
-  // Load addresses
-  useEffect(() => {
-    const localAddress = (() => {
-      try { return JSON.parse(localStorage.getItem(LOCAL_ADDRESS_KEY) || "null"); } catch { return null; }
-    })();
-
-    if (!user) {
-      if (localAddress) {
-        Promise.resolve().then(() => {
-          setAddresses([localAddress]);
-          setSelectedAddr(localAddress._id);
-        });
-      }
-      return;
-    }
-
-    localStorage.removeItem(LOCAL_ADDRESS_KEY);
-    setAddresses([]);
-    setSelectedAddr(null);
-    authFetch("/api/addresses").then((r) => r.json()).then((d) => {
-      const rawAddresses = d.addresses || d.data || [];
-      if (rawAddresses.length > 0) {
-        const normalized = rawAddresses.map((a) => ({
-          ...a,
-          _id: a.id,
-          name: a.full_name || a.name,
-          street: a.address_line1 || a.street,
-          city: a.city,
-          state: a.state,
-          pincode: a.pincode,
-          phone: a.phone,
-          type: a.type || "home",
-          isDefault: a.is_default,
-        }));
-        setAddresses(normalized);
-        const def = normalized.find((a) => a.isDefault) || normalized[0];
-        if (def) setSelectedAddr(def._id);
-      }
-    }).catch(() => toast.error("Could not load addresses"));
-  }, [user]);
-
-  const saveLocalAddress = () => {
-    const localId = `local-${Date.now()}`;
-    const saved = {
-      ...form,
-      _id: localId,
-      id: localId,
-      is_default: form.isDefault,
-      isDefault: form.isDefault,
-    };
-    localStorage.setItem(LOCAL_ADDRESS_KEY, JSON.stringify(saved));
-    setAddresses((prev) => [saved, ...prev.filter((a) => !String(a._id || a.id).startsWith("local-"))]);
-    setSelectedAddr(saved._id);
-    setShowForm(false);
-    setForm({ type: "home", name: "", street: "", city: "", state: "Karnataka", pincode: "", phone: "", isDefault: false });
-    setFormErrors({});
-    return saved;
-  };
-
-  // Calculations — SERVER-SIDE is the source of truth, this is display only
-  const subtotal = checkoutItems.reduce((a, i) => a + i.price * i.qty, 0);
+  // Calculate totals
+  const totalBundles = checkoutItems.reduce((sum, item) => sum + (item.qty || 0), 0);
+  const subtotal = getBundlePrice(totalBundles);
   const discount = couponApplied ? subtotal * 0.1 : 0;
   const shipping = 0; // FREE DELIVERY — always ₹0, enforced server-side
-  // GST is deactivated: no separate tax line is added. Price shown already
-  // includes GST rather than adding it on top — see bundle-pricing.constants.ts.
   const total = subtotal - discount + shipping;
+
+  // Handle coupon application
+  const handleApplyCoupon = async () => {
 
   const handleSaveAddress = async () => {
     const errors = validateAddress(form);

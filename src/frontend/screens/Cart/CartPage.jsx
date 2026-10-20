@@ -31,22 +31,30 @@ export default function CartPage() {
     setMounted(true);
   }, []);
 
-  const subtotal = cartItems.reduce((a, i) => a + i.price * i.qty, 0);
+  // Helper function to calculate bundle price
+  const getBundlePrice = (bundles) => {
+    if (bundles === 1) return 384;
+    if (bundles === 2) return 640;
+    if (bundles === 3) return 896;
+    if (bundles === 4) return 1152;
+    if (bundles === 5) return 1408;
+    if (bundles >= 6) return 1664 + ((bundles - 6) * 256);
+    return 0;
+  };
+
+  // Calculate totals ONLY after mounted
+  const totalBundles = mounted ? cartItems.reduce((sum, item) => sum + (item.qty || 0), 0) : 0;
+  const subtotal = mounted ? getBundlePrice(totalBundles) : 0;
   const discount = promoApplied ? subtotal * 0.1 : 0;
   const shipping = 0; // FREE DELIVERY — always ₹0
-  // GST is deactivated: no separate tax line is added. Price shown already
-  // includes GST rather than adding it on top — see bundle-pricing.constants.ts.
   const total = subtotal - discount + shipping;
   const progress = 100; // Always free shipping
   const remaining = 0;
 
   // Calculate total packets in cart (each bundle = 6 packets)
-  const totalPackets = cartItems.reduce((sum, item) => {
-    // Each qty represents 1 bundle = 6 packets
-    return sum + (item.qty * 6);
-  }, 0);
+  const totalPackets = totalBundles * 6;
   
-  const isMultipleOfSix = totalPackets % 6 === 0;
+  const isMultipleOfSix = totalPackets % 6 === 0 || totalPackets === 0;
   const packetsToAdd = isMultipleOfSix ? 0 : 6 - (totalPackets % 6);
   const packetsToRemove = isMultipleOfSix ? 0 : totalPackets % 6;
 
