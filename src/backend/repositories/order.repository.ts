@@ -132,8 +132,8 @@ export class SupabaseOrderRepository
       .from('shipments')
       .insert({
         order_id: orderId,
-        provider: 'shiprocket',
-        courier_name: shipmentData.courier_name || 'Shiprocket',
+        provider: 'dtdc',
+        courier_name: shipmentData.courier_name || 'DTDC',
         status: shipmentData.status || 'created',
         raw_response: {},
       })

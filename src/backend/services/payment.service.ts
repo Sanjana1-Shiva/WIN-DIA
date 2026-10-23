@@ -440,7 +440,7 @@ export class PaymentServiceImpl implements PaymentService {
 
     // Payment confirmed via webhook (may arrive before or instead of the
     // client-side verify call, e.g. if the user closed their browser) —
-    // book the Shiprocket shipment automatically here too. autoBookShipment
+    // book the DTDC shipment automatically here too. autoBookShipment
     // is idempotent (checks order.awb_code first), so this is safe even if
     // payment/verify already booked it.
     await autoBookShipment(orderId, '[PaymentService.handleWebhook]');

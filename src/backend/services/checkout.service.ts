@@ -240,7 +240,7 @@ export class CheckoutServiceImpl implements CheckoutService {
       const bundlePricing = calculateBundlePricing(bundles);
 
       // SERVER-SIDE PRICE ENFORCEMENT: Never trust frontend-sent price.
-      // Price is ALWAYS BundlePricing.BUNDLE_PRICE per bundle, regardless of what frontend sends.
+      // Use tiered pricing: total = 384 + (N - 1) × 256
       const itemTotal = bundlePricing.lineTotal;
       subtotal += itemTotal;
 
@@ -259,6 +259,30 @@ export class CheckoutServiceImpl implements CheckoutService {
         ));
       }
 
+      // SECURITY: Fetch authoritative product weight from database, ignore frontend-submitted weight
+      const catalogProduct = prodExistsCheck.value;
+      const catalogWeight = catalogProduct.net_weight; // e.g., "480g" from products table
+      
+      let weightPerBundle: number;
+      if (typeof catalogWeight === 'string') {
+        const parsed = parseInt(catalogWeight.replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          weightPerBundle = parsed;
+        } else {
+          console.error(`[CheckoutService] ERROR: Product "${catalogProduct.name}" has invalid net_weight in database: "${catalogWeight}"`);
+          return failure(new ValidationError(
+            `Product "${catalogProduct.name}" has invalid weight configuration. Please contact support.`
+          ));
+        }
+      } else if (typeof catalogWeight === 'number' && catalogWeight > 0) {
+        weightPerBundle = catalogWeight;
+      } else {
+        console.error(`[CheckoutService] ERROR: Product "${catalogProduct.name}" has no weight in database!`);
+        return failure(new ValidationError(
+          `Product "${catalogProduct.name}" is missing weight configuration. Please contact support.`
+        ));
+      }
+
       // Stock validation: check against packets to be SHIPPED (12 per bundle)
       // This is the real quantity that leaves the warehouse
       console.log(`[TRACE STEP 4: STOCK_VALIDATION] Product resolved: id=${validProductId}, name="${item.name}", rawId="${rawId}"`);
@@ -274,12 +298,15 @@ export class CheckoutServiceImpl implements CheckoutService {
       preparedOrderItems.push({
         product_id: validProductId,
         name: item.name || item.product_name || 'WIN-DIA Product',
-        // Store bundle price as the unit price (price per bundle)
-        price: BundlePricing.BUNDLE_PRICE,
+        // Store the per-bundle unit price (average price per bundle for this quantity)
+        price: bundlePricing.unitPrice,
         // qty = number of bundles ordered
         qty: bundles,
         flavor: item.flavor || null,
-        net_weight_grams: Number(item.net_weight_grams || item.net_weight || item.netWeight || 200) * bundlePricing.packetsShipped,
+        // CRITICAL: Store weight PER BUNDLE (not total line weight)
+        // DTDC will multiply this by qty to get total weight
+        // For WIN-DIA: 1 bundle = 6 packets × 40g = 240g
+        net_weight_grams: weightPerBundle,
         image: item.image || item.image_url || null,
       });
     }
@@ -366,7 +393,7 @@ export class CheckoutServiceImpl implements CheckoutService {
         payment_method: selectedPaymentMethod,
       },
       {
-        courier_name: 'Shiprocket',
+        courier_name: 'DTDC',
         status: 'pending',
       }
     );
@@ -552,12 +579,17 @@ export class CheckoutServiceImpl implements CheckoutService {
       // STEP 9: CLEAR_CART & INCREMENT COUPON USAGE
       await this.finalizeCartAndCoupon(userId, validatedCouponId);
 
-      // COD orders have no payment to wait for, so book the Shiprocket
+      // COD orders have no payment to wait for, so book the DTDC
       // shipment right away. Online (Razorpay) orders instead get booked
       // automatically once payment is confirmed — see autoBookShipment calls
       // in app/api/payment/verify and PaymentService.handleWebhook.
+      console.log(`[CheckoutService] Payment method: ${selectedPaymentMethod}, Order ID: ${createdOrder.id}`);
       if (selectedPaymentMethod === 'cod') {
+        console.log(`[CheckoutService] ✅ COD order detected - calling autoBookShipment for order ${createdOrder.order_number}`);
         await autoBookShipment(createdOrder.id, '[CheckoutService.processCheckout:COD]');
+        console.log(`[CheckoutService] ✅ autoBookShipment call completed for order ${createdOrder.order_number}`);
+      } else {
+        console.log(`[CheckoutService] ⏭️ Skipping auto-shipment for online payment (will trigger after payment confirmation)`);
       }
 
       const totalProcessTime = Date.now() - startTime;

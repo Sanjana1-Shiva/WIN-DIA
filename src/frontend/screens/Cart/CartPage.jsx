@@ -31,7 +31,13 @@ export default function CartPage() {
     setMounted(true);
   }, []);
 
-  const subtotal = cartItems.reduce((a, i) => a + i.price * i.qty, 0);
+  const totalBundles = cartItems.reduce((sum, i) => sum + i.qty, 0);
+  
+  // Apply tiered pricing formula: total = 384 + (N - 1) × 256
+  // This matches the server-side calculation in bundle-pricing.constants.ts
+  const tieredSubtotal = totalBundles > 0 ? 384 + (totalBundles - 1) * 256 : 0;
+  
+  const subtotal = tieredSubtotal;
   const discount = promoApplied ? subtotal * 0.1 : 0;
   const shipping = 0; // FREE DELIVERY — always ₹0
   // GST is deactivated: no separate tax line is added. Price shown already

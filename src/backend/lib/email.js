@@ -112,7 +112,7 @@ const STATUS_COPY = {
   returned:         { subject: "Your order return has been processed",  headline: "Order Returned"       },
 };
 
-/** Sent whenever order_status changes (from NimbusPost webhook or admin update). */
+/** Sent whenever order_status changes (from webhook or admin update). */
 export async function sendShippingUpdateEmail(order, to) {
   if (!to) return { sent: false, reason: "no_email_provided" };
 

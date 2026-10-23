@@ -10,9 +10,25 @@ import {
 import { useAuth } from "@/src/frontend/hooks/useAuth";
 import styles from "./OrderConfirmationPage.module.css";
 
-const STATUS_STEPS = ["placed", "confirmed", "processing", "shipped", "out_for_delivery", "delivered"];
-const STATUS_LABELS = { placed: "Order Placed", confirmed: "Confirmed", processing: "Processing", shipped: "Shipped", out_for_delivery: "Out for Delivery", delivered: "Delivered" };
-const CANCELLABLE_STATUSES = ["placed", "confirmed", "processing"];
+// Status steps differ based on payment method
+const getCODStatusSteps = () => ["placed", "confirmed", "shipped", "out_for_delivery", "delivered", "payment_collected"];
+const getCODStatusLabels = () => ({ 
+  placed: "Order Placed", 
+  confirmed: "Confirmed", 
+  shipped: "Shipped", 
+  out_for_delivery: "Out for Delivery", 
+  delivered: "Delivered",
+  payment_collected: "Payment Collected"
+});
+
+const getOnlineStatusSteps = () => ["placed", "paid", "shipped", "out_for_delivery", "delivered"];
+const getOnlineStatusLabels = () => ({ 
+  placed: "Order Placed", 
+  paid: "Payment Confirmed", 
+  shipped: "Shipped", 
+  out_for_delivery: "Out for Delivery", 
+  delivered: "Delivered"
+});
 
 export default function OrderConfirmationPage() {
   const searchParams = useSearchParams();
@@ -20,7 +36,6 @@ export default function OrderConfirmationPage() {
   const { authFetch, user } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!orderId || !authFetch) return;
@@ -30,41 +45,6 @@ export default function OrderConfirmationPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [orderId, authFetch]);
-
-  const handleCancelOrder = async () => {
-    if (!confirm("Are you sure you want to cancel this order?")) return;
-    setCancelling(true);
-    try {
-      const res = await authFetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action: "cancel", reason: "Cancelled by customer from order details page" }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        alert(data.error || "Could not cancel order.");
-        return;
-      }
-      
-      // Show success message with refund info
-      const updatedOrder = data.data || data.order;
-      if (updatedOrder && updatedOrder.payment_status === 'refunded') {
-        alert("Order cancelled successfully! Your payment has been refunded and will be credited to your account within 5-7 business days.");
-      } else if (updatedOrder && updatedOrder.payment_status === 'paid') {
-        alert("Order cancelled successfully! Refund is being processed and will be credited to your account within 5-7 business days.");
-      } else {
-        alert("Order cancelled successfully!");
-      }
-      
-      // Refresh order data
-      const refreshRes = await authFetch(`/api/orders/${orderId}`);
-      const refreshData = await refreshRes.json();
-      if (refreshData.success) setOrder(refreshData.order);
-    } catch {
-      alert("Could not cancel order. Please try again.");
-    } finally {
-      setCancelling(false);
-    }
-  };
 
   if (loading) return (
     <div className={styles.loadWrap}>
@@ -85,7 +65,21 @@ export default function OrderConfirmationPage() {
     </div>
   );
 
-  const statusIdx = STATUS_STEPS.indexOf(order.order_status);
+  const isCOD = order.payment_method === 'cod';
+  const STATUS_STEPS = isCOD ? getCODStatusSteps() : getOnlineStatusSteps();
+  const STATUS_LABELS = isCOD ? getCODStatusLabels() : getOnlineStatusLabels();
+  
+  // For COD orders, map 'confirmed' status to same position, but show different flow
+  // For online orders, map payment_status to appropriate step
+  let displayStatus = order.order_status;
+  if (!isCOD && order.payment_status === 'paid' && order.order_status === 'placed') {
+    displayStatus = 'paid'; // Show as paid step for online orders
+  }
+  if (isCOD && order.order_status === 'delivered' && order.payment_status === 'cod_collected') {
+    displayStatus = 'payment_collected'; // COD final step
+  }
+  
+  const statusIdx = STATUS_STEPS.indexOf(displayStatus);
   const addr = order.shipping_address || {};
 
   return (
@@ -196,9 +190,41 @@ export default function OrderConfirmationPage() {
               </div>
 
               <div className={styles.totalRow}>
-                <span>Total Paid <small style={{ fontWeight: 400, opacity: 0.7 }}>(GST included)</small></span>
+                <span>
+                  {order.order_status === 'cancelled' 
+                    ? 'Order Total' 
+                    : order.payment_method === 'cod' && order.payment_status === 'cod_pending'
+                    ? 'Total Amount'
+                    : 'Total Paid'
+                  } <small style={{ fontWeight: 400, opacity: 0.7 }}>(GST included)</small>
+                </span>
                 <span>₹{order.total_price?.toFixed(2)}</span>
               </div>
+              
+              {/* Show cancellation notice in order summary */}
+              {order.order_status === 'cancelled' && (
+                <div style={{
+                  padding: "12px",
+                  marginTop: "12px",
+                  background: "#fef2f2",
+                  border: "1px solid #ef4444",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  color: "#dc2626",
+                  textAlign: "center"
+                }}>
+                  <strong>Order Cancelled</strong>
+                  {order.payment_status === 'refunded' && (
+                    <><br /><span style={{ color: "#059669" }}>Refund: ₹{order.total_price?.toFixed(2)}</span></>
+                  )}
+                  {order.payment_status === 'refund_initiated' && (
+                    <><br /><span style={{ color: "#f59e0b" }}>Refund Processing</span></>
+                  )}
+                  {order.payment_status === 'failed' && order.payment_method === 'cod' && (
+                    <><br /><span style={{ color: "#6b7280" }}>No payment collected</span></>
+                  )}
+                </div>
+              )}
 
               {/* Payment info */}
               <div className={styles.payInfo}>
@@ -208,60 +234,66 @@ export default function OrderConfirmationPage() {
                   <p className={styles.payValue}>
                     {order.payment_method === "cod" ? "Cash on Delivery" : "Paid Online"}
                     {" · "}
-                    <span className={`${styles.payStatus} ${order.payment_status === "paid" ? styles.payPaid : styles.payPending}`}>
-                      {order.payment_status === "paid" ? "Paid" : "Pending"}
+                    <span className={`${styles.payStatus} ${
+                      order.payment_status === "paid" || order.payment_status === "cod_collected" 
+                        ? styles.payPaid 
+                        : order.payment_status === "cod_pending"
+                        ? styles.payPending
+                        : order.payment_status === "refund_initiated"
+                        ? styles.payPending
+                        : order.payment_status === "refunded"
+                        ? styles.payPaid
+                        : styles.payPending
+                    }`}>
+                      {order.payment_status === "paid" 
+                        ? "Paid" 
+                        : order.payment_status === "cod_pending" 
+                        ? "Pending" 
+                        : order.payment_status === "cod_collected"
+                        ? "Collected"
+                        : order.payment_status === "refund_initiated"
+                        ? "Refund Processing"
+                        : order.payment_status === "refunded"
+                        ? "Refunded"
+                        : "Pending"}
                     </span>
                   </p>
                 </div>
               </div>
 
-              {/* ETA */}
-              <div className={styles.etaBox}>
-                <FiClock />
-                <div>
-                  <p className={styles.etaLabel}>Estimated Delivery</p>
-                  <p className={styles.etaValue}>
-                    {(() => {
-                      const d = new Date();
-                      d.setDate(d.getDate() + 5);
-                      return d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
-                    })()}
-                  </p>
+              {/* ETA - only show if order is not cancelled */}
+              {order.order_status !== 'cancelled' && (
+                <div className={styles.etaBox}>
+                  <FiClock />
+                  <div>
+                    <p className={styles.etaLabel}>Estimated Delivery</p>
+                    <p className={styles.etaValue}>
+                      {(() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 5);
+                        return d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+                      })()}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
 
             {/* CTA buttons */}
             <motion.div className={styles.ctaCard} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 }}>
-              {CANCELLABLE_STATUSES.includes(order.order_status) && (
-                <button
-                  onClick={handleCancelOrder}
-                  disabled={cancelling}
-                  className={styles.ordersBtn}
-                  style={{
-                    width: "100%",
-                    marginBottom: "12px",
-                    cursor: cancelling ? "not-allowed" : "pointer",
-                    opacity: cancelling ? 0.6 : 1
-                  }}
-                >
-                  <FiXCircle /> {cancelling ? "Cancelling..." : "Cancel Order"}
-                </button>
-              )}
-              
-              {order.payment_status === 'refunded' && (
+              {order.order_status === 'cancelled' && (
                 <div style={{
                   padding: "12px",
                   marginBottom: "12px",
-                  background: "#10b98126",
-                  border: "1px solid #10b981",
+                  background: "#fef2f2",
+                  border: "1px solid #ef4444",
                   borderRadius: "8px",
                   fontSize: "13px",
-                  color: "#059669",
+                  color: "#dc2626",
                   textAlign: "center"
                 }}>
-                  <strong>Refunded</strong><br />
-                  Your payment has been refunded and will be credited within 5-7 business days.
+                  <strong>Order Cancelled</strong><br />
+                  For assistance, please contact customer support.
                 </div>
               )}
               

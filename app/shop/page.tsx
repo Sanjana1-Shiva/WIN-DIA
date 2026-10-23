@@ -53,6 +53,18 @@ async function fetchAllProducts(): Promise<Product[]> {
           productId = slug.replace(/^(gluten-free|everyday|combo)-/, "") || flavor;
         }
         
+        // Parse net_weight from database (e.g., "480g" → 480)
+        const parseNetWeight = (raw: unknown): number => {
+          if (typeof raw === "string") {
+            const parsed = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+            return !isNaN(parsed) && parsed > 0 ? parsed : 480;
+          }
+          if (typeof raw === "number") {
+            return raw > 0 ? raw : 480;
+          }
+          return 480; // Default: 12 × 40g = 480g
+        };
+
         return {
           id: productId, // This must match the static product IDs
           dbId: String(p.id ?? ""),
@@ -65,7 +77,7 @@ async function fetchAllProducts(): Promise<Product[]> {
           offer: "12 × 40g Bundle",
           offerDetails: "🎁 Pay for 10 + Get 2 FREE",
           delivery: "🚚 Free Delivery",
-          netWeight: "480g",
+          netWeight: parseNetWeight(p.net_weight),
         };
       });
   } catch {

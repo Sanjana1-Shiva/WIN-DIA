@@ -5,10 +5,6 @@ import Link from "next/link";
 import { useAuth } from "@/src/frontend/hooks/useAuth";
 import "./orders.css";
 
-// Matches the backend's STATUS_TRANSITIONS in order.service.ts — cancellation
-// is only allowed before an order ships.
-const CANCELLABLE_STATUSES = ["placed", "confirmed", "processing"];
-
 function formatCurrency(amount) {
   return `Rs. ${Number(amount || 0).toFixed(2)}`;
 }
@@ -36,7 +32,6 @@ export default function ProfileOrdersPage() {
   const { authFetch, user, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cancellingId, setCancellingId] = useState(null);
 
   const loadOrders = () => {
     setLoading(true);
@@ -62,27 +57,6 @@ export default function ProfileOrdersPage() {
     loadOrders();
   }, [authLoading, user]);
 
-  const handleCancelOrder = async (orderId) => {
-    if (!confirm("Cancel this order?")) return;
-    setCancellingId(orderId);
-    try {
-      const res = await authFetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ action: "cancel", reason: "Cancelled by customer from profile page" }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        alert(data.error || "Could not cancel order.");
-        return;
-      }
-      loadOrders();
-    } catch {
-      alert("Could not cancel order. Please try again.");
-    } finally {
-      setCancellingId(null);
-    }
-  };
-
   if (authLoading || loading) return null;
 
   return (
@@ -106,20 +80,28 @@ export default function ProfileOrdersPage() {
               <StatusBadge status={order.order_status} />
             </div>
             <p className="order-meta-line">
-              {formatDate(order.created_at)} &nbsp;·&nbsp; Payment: {order.payment_status} &nbsp;·&nbsp; {formatCurrency(order.total_price)}
+              {formatDate(order.created_at)} &nbsp;·&nbsp; Payment: {
+                order.payment_status === "paid" 
+                  ? "Paid" 
+                  : order.payment_status === "cod_pending" 
+                  ? "COD (Pending)" 
+                  : order.payment_status === "cod_collected"
+                  ? "COD (Collected)"
+                  : order.payment_status === "refund_initiated"
+                  ? "Refund Processing"
+                  : order.payment_status === "refunded"
+                  ? "Refunded"
+                  : order.payment_status
+              } &nbsp;·&nbsp; {formatCurrency(order.total_price)}
             </p>
             <div className="order-actions">
               <Link href={`/order-confirmation?orderId=${order.id}`} className="order-action-link">
                 View details
               </Link>
-              {CANCELLABLE_STATUSES.includes(order.order_status) && (
-                <button
-                  className="order-cancel-btn"
-                  disabled={cancellingId === order.id}
-                  onClick={() => handleCancelOrder(order.id)}
-                >
-                  {cancellingId === order.id ? "Cancelling..." : "Cancel order"}
-                </button>
+              {order.order_status === 'cancelled' && (
+                <span className="order-meta-text" style={{ fontSize: '13px', color: '#6b7280' }}>
+                  For assistance, contact support
+                </span>
               )}
             </div>
           </div>

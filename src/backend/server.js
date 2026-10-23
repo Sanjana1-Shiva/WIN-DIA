@@ -72,37 +72,6 @@ app.get("/dev/test-razorpay", async (_req, res) => {
   }
 });
 
-// ── DEV: Test NimbusPost ──────────────────────────────────────────────────────
-app.get("/dev/test-nimbuspost", async (_req, res) => {
-  if (process.env.NODE_ENV !== "development") return res.status(403).json({ error: "Dev only" });
-  const token = process.env.NIMBUSPOST_ACCESS_TOKEN;
-  const refreshToken = process.env.NIMBUSPOST_REFRESH_TOKEN;
-  const baseUrl = process.env.NIMBUSPOST_BASE_URL || "https://api-v2.nimbuspost.com";
-
-  if (!token || token.startsWith("REPLACE_ME")) {
-    return res.json({ success: false, message: "NIMBUSPOST_ACCESS_TOKEN not set", howToGet: ["1. Login to https://app.nimbuspost.com", "2. DevTools → Network → filter api-v2.nimbuspost.com", "3. Copy Authorization header value (after Bearer )", "4. Paste into NIMBUSPOST_ACCESS_TOKEN in .env.local"] });
-  }
-
-  try {
-    if (refreshToken && !refreshToken.startsWith("REPLACE_ME")) {
-      const r = await fetch(`${baseUrl}/auth/api/v1/sessions/refresh`, { method: "POST", headers: { "Content-Type": "application/json", Cookie: `npRefresh=${refreshToken}` }, body: "{}" });
-      const data = await r.json().catch(() => ({}));
-      if (r.ok && data?.success) {
-        const meRes = await fetch(`${baseUrl}/auth/api/v1/auth/me`, { method: "GET", headers: { Authorization: `Bearer ${data.data.accessToken}` } });
-        const meData = await meRes.json().catch(() => ({}));
-        return res.json({ success: true, message: "Token auto-refreshed", user: meData?.data?.user?.email, org: meData?.data?.currentOrg?.companyName, refreshTokenValid: true });
-      }
-      return res.json({ success: false, message: "Refresh token expired — log in again" });
-    }
-    const r = await fetch(`${baseUrl}/auth/api/v1/auth/me`, { method: "GET", headers: { Authorization: `Bearer ${token}` } });
-    const data = await r.json().catch(() => ({}));
-    if (r.ok && data?.success) return res.json({ success: true, message: "Token valid", user: data?.data?.user?.email });
-    return res.json({ success: false, message: "Token invalid or expired" });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ success: false, error: "Route not found" }));
 

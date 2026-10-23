@@ -155,7 +155,18 @@ export default function CheckoutPage() {
   };
 
   // Calculations — SERVER-SIDE is the source of truth, this is display only
-  const subtotal = checkoutItems.reduce((a, i) => a + i.price * i.qty, 0);
+  // IMPORTANT: Cart items may have per-bundle prices from the product catalog.
+  // However, we need to apply tiered pricing across ALL bundles in the order.
+  // The server independently recalculates using tiered pricing, so this is for preview.
+  
+  // Calculate total bundles in order for tiered pricing
+  const totalBundles = checkoutItems.reduce((sum, i) => sum + i.qty, 0);
+  
+  // For display purposes, calculate what the server will charge using tiered pricing
+  // Formula: total = 384 + (N - 1) × 256
+  const tieredTotal = 384 + (Math.max(1, totalBundles) - 1) * 256;
+  
+  const subtotal = tieredTotal;
   const discount = couponApplied ? subtotal * 0.1 : 0;
   const shipping = 0; // FREE DELIVERY — always ₹0, enforced server-side
   // GST is deactivated: no separate tax line is added. Price shown already
@@ -340,7 +351,7 @@ export default function CheckoutPage() {
 
           {/* Steps */}
           <div className={styles.steps}>
-            {["Shipping", "Review", "Payment"].map((label, i) => (
+            {["Delivery Details", "Review", "Payment"].map((label, i) => (
               <div key={label} className={styles.stepGroup}>
                 <div className={`${styles.step} ${step > i + 1 ? styles.stepDone : ""} ${step === i + 1 ? styles.stepActive : ""}`}>
                   <span>{step > i + 1 ? <FiCheck /> : i + 1}</span>
@@ -538,9 +549,9 @@ export default function CheckoutPage() {
                     <img src={item.image || "/images/product-methi.jpg"} alt={item.name} />
                     <div>
                       <p className={styles.sItemName}>{item.name}</p>
-                      <p className={styles.sItemQty}>× {item.qty}</p>
+                      <p className={styles.sItemQty}>× {item.qty} {item.qty === 1 ? 'bundle' : 'bundles'}</p>
                     </div>
-                    <span className={styles.sItemPrice}>₹{(item.price * item.qty).toFixed(0)}</span>
+                    <span className={styles.sItemPrice}>{item.qty} × 6 packets</span>
                   </div>
                 ))}
               </div>
@@ -608,7 +619,10 @@ export default function CheckoutPage() {
               </div>
 
               <div className={styles.breakdown}>
-                <div className={styles.bRow}><span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
+                <div className={styles.bRow}>
+                  <span>{totalBundles} {totalBundles === 1 ? 'Bundle' : 'Bundles'} × 6 packets each</span>
+                  <span>₹{subtotal.toFixed(0)}</span>
+                </div>
                 {couponApplied && <div className={`${styles.bRow} ${styles.bDiscount}`}><span>Discount (10%)</span><span>−₹{discount.toFixed(2)}</span></div>}
                 <div className={styles.bRow}><span>Shipping</span><span className={styles.free}>FREE</span></div>
               </div>

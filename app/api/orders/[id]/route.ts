@@ -45,10 +45,9 @@ export async function GET(
 }
 
 /**
- * Customer-initiated order cancellation. Body: { action: 'cancel', reason?: string }.
- * Ownership is enforced inside OrderService.cancelOrder (via getOrderById's userId check),
- * and the underlying status-transition rules (order.service.ts STATUS_TRANSITIONS) still
- * apply — cancellation is only allowed from placed/confirmed/processing, not after shipped.
+ * CUSTOMER ORDERS ENDPOINT - READ ONLY
+ * Per WIN-DIA policy: Customers CANNOT cancel orders.
+ * Order cancellations can only be processed by admin through customer support.
  */
 export async function PATCH(
   request: Request,
@@ -62,17 +61,23 @@ export async function PATCH(
     }
 
     const body = await request.json().catch(() => ({}));
-    if (body.action !== 'cancel') {
+    
+    // Block all customer-initiated modifications
+    if (body.action === 'cancel') {
       return NextResponse.json(
-        createErrorResponse('VALIDATION_ERROR', 'Unsupported action'),
-        { status: 400 }
+        createErrorResponse(
+          'FORBIDDEN',
+          'Order cancellations are not available. Please contact customer support for assistance.'
+        ),
+        { status: 403 }
       );
     }
 
-    const orderService = authRes.value.scope.resolve<OrderService>(ServiceTokens.OrderService);
-    const result = await orderService.cancelOrder(id, authRes.value.id, body.reason);
-
-    return handleServiceResult(result);
+    // Block any other actions
+    return NextResponse.json(
+      createErrorResponse('VALIDATION_ERROR', 'Order modifications are not supported'),
+      { status: 400 }
+    );
   } catch (err: any) {
     return NextResponse.json(
       createErrorResponse('INTERNAL_SERVER_ERROR', err.message || 'An unexpected error occurred'),

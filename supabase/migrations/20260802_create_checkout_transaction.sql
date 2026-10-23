@@ -57,8 +57,8 @@ BEGIN
     INSERT INTO public.shipments (order_id, provider, courier_name, status)
     VALUES (
         v_order.id,
-        'nimbuspost',
-        COALESCE(p_shipment_data->>'courier_name', 'NimbusPost'),
+        'shiprocket',
+        COALESCE(p_shipment_data->>'courier_name', 'Shiprocket'),
         COALESCE(p_shipment_data->>'status', 'created')
     ) RETURNING * INTO v_shipment;
 

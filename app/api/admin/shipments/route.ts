@@ -5,13 +5,13 @@ import { ShipmentService } from '@/src/backend/services/shipment.service';
 import { getAdminUserContext, handleServiceResult } from '@/src/backend/utils/route-helper.util';
 import { createErrorResponse } from '@/src/backend/types/api-response.types';
 import { getAdminClient } from '@/src/backend/config/supabase.config';
-import { shiprocketProvider } from '@/src/backend/lib/shiprocket';
+import { getShippingProvider } from '@/src/backend/lib/shipping';
 
 export const runtime = 'nodejs';
 
 /**
  * POST /api/admin/shipments
- * Admin-only: Creates a Shiprocket shipment for a confirmed/paid order.
+ * Admin-only: Creates a DTDC shipment for a confirmed/paid order.
  * Body: { orderId: string }
  */
 export async function POST(request: Request) {
@@ -62,8 +62,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create shipment via Shiprocket
-    const result = await shiprocketProvider.createShipment({
+    // Get DTDC shipping provider
+    const shippingProvider = getShippingProvider();
+
+    // Create shipment via DTDC
+    const result = await shippingProvider.createShipment({
       orderId: order.id,
       orderNumber: order.order_number,
       shippingAddress: order.shipping_address || {},
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
     // Update shipments table
     await client.from('shipments').upsert({
       order_id: order.id,
-      provider: 'shiprocket',
+      provider: 'dtdc',
       awb_code: result.awbCode || null,
       courier_name: result.courierName || null,
       status: result.success ? 'created' : 'failed',
@@ -100,7 +103,7 @@ export async function POST(request: Request) {
     await client.from('orders').update({
       awb_code: result.awbCode || null,
       courier_name: result.courierName || null,
-      shipping_provider: 'shiprocket',
+      shipping_provider: 'dtdc',
       order_status: 'processing',
       updated_at: new Date().toISOString(),
     }).eq('id', order.id);
@@ -112,7 +115,6 @@ export async function POST(request: Request) {
         courierName: result.courierName,
         trackingUrl: result.trackingUrl,
         shipmentId: result.shipmentId,
-        shiprocketOrderId: result.orderId,
       },
     }, { status: 201 });
   } catch (err: any) {
@@ -163,7 +165,9 @@ export async function GET(request: Request) {
       });
     }
 
-    const trackResult = await shiprocketProvider.trackShipment(order.awb_code);
+    // Get DTDC shipping provider
+    const shippingProvider = getShippingProvider();
+    const trackResult = await shippingProvider.trackShipment(order.awb_code);
 
     return NextResponse.json({
       success: true,

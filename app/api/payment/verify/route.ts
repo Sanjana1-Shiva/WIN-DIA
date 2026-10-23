@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       console.error(`[payment/verify] Could not load order_items for order ${orderId}:`, itemsRes.error.message);
     }
 
-    // Payment is confirmed — book the Shiprocket shipment automatically.
+    // Payment is confirmed — book the DTDC shipment automatically.
     // Non-fatal: the customer's payment already succeeded, so a shipping
     // booking hiccup must not fail this response. If it fails, the admin's
     // "Retry shipment" button (app/admin/orders) is the manual fallback.

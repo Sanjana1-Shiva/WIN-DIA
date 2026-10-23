@@ -57,3 +57,12 @@ backup_files_*/
 # Test files
 public/check-auth.html
 scripts/
+GUEST_CHECKOUT_REQUIREMENTS.md/
+        ORDER_STATUS_REFACTOR_COMPLETE.md/
+        TEST_EXECUTION_REPORT.md/
+        WEIGHT_BUG_FIX_REPORT.md/
+        WEIGHT_FIX_COMPLETE_SUMMARY.md/
+
+
+ supabase/migrations/20260820_update_payment_status_for_cod.sql/
+        supabase/migrations/20260824_fix_tracking_token_nullable.sql/

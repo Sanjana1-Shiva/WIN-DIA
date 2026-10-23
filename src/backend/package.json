@@ -1,7 +1,7 @@
 {
   "name": "windia-pay-ship",
   "version": "1.0.0",
-  "description": "WIN-DIA payment (Razorpay) and shipping (NimbusPost) backend service",
+  "description": "WIN-DIA payment (Razorpay) and shipping (DTDC) backend service",
   "main": "server.js",
   "type": "module",
   "scripts": {

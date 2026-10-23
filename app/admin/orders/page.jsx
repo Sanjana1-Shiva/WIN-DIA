@@ -9,10 +9,13 @@ import * as XLSX from "xlsx";
 const STATUSES = [
   "placed",
   "confirmed",
-  "processing",
   "shipped",
+  "out_for_delivery",
   "delivered",
+  "payment_collected",
   "cancelled",
+  "rto_initiated",
+  "rto_delivered",
 ];
 
 // Date filter options for sales reports
@@ -399,10 +402,13 @@ function StatusBadge({ status }) {
   const colorMap = {
     placed: "#f59e0b",
     confirmed: "#3b82f6",
-    processing: "#8b5cf6",
     shipped: "#06b6d4",
+    out_for_delivery: "#8b5cf6",
     delivered: "#10b981",
+    payment_collected: "#059669",
     cancelled: "#ef4444",
+    rto_initiated: "#f97316",
+    rto_delivered: "#dc2626",
   };
   const color = colorMap[status] || "#6b7280";
 
@@ -452,7 +458,19 @@ function OrderRow({ order, authFetch }) {
       <td>{formatDate(order.created_at)}</td>
       <td>{formatCurrency(order.total_price)}</td>
       <td>
-        <span className={styles.status}>{order.payment_status || "pending"}</span>
+        <span className={styles.status}>
+          {order.payment_status === "paid" 
+            ? "Paid" 
+            : order.payment_status === "cod_pending" 
+            ? "COD Pending" 
+            : order.payment_status === "cod_collected"
+            ? "COD Collected"
+            : order.payment_status === "refund_initiated"
+            ? "Refunding"
+            : order.payment_status === "refunded"
+            ? "Refunded"
+            : order.payment_status || "pending"}
+        </span>
       </td>
       <td>
         <StatusBadge status={order.order_status || "placed"} />

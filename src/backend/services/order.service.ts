@@ -238,7 +238,7 @@ export class OrderServiceImpl implements OrderService {
    * successful-payment code path.
    */
   public async markOrderPaid(orderId: string, note?: string, updatedBy?: string): Promise<Result<Order, AppError>> {
-    const statusRes = await this.updateOrderStatus(orderId, OrderStatus.PROCESSING, note, updatedBy);
+    const statusRes = await this.updateOrderStatus(orderId, OrderStatus.CONFIRMED, note, updatedBy);
     if (!statusRes.success) return statusRes;
 
     const paymentUpdateRes = await this.orderRepo.update(orderId, { payment_status: PaymentStatus.PAID });
@@ -265,22 +265,16 @@ export class OrderServiceImpl implements OrderService {
     const existing = await this.getOrderById(orderId, userId);
     if (!existing.success) return existing;
 
-    // Check if shipment has been assigned and enforce 2-day cutoff
+    const order = existing.value;
+
+    // Check if shipment has been assigned - only allow cancel before shipment
     const shipmentRes = await this.shipmentRepo.findByOrderId(orderId);
     if (shipmentRes.success && shipmentRes.value && shipmentRes.value.shipped_at) {
-      const shippedAt = new Date(shipmentRes.value.shipped_at);
-      const cutoffDate = new Date(shippedAt);
-      cutoffDate.setDate(cutoffDate.getDate() - 2); // 2 days before shipping
-      cutoffDate.setHours(12, 0, 0, 0); // Set to 12:00 PM (noon)
-
-      const now = new Date();
-      if (now > cutoffDate) {
-        return failure(
-          new ValidationError(
-            `Cancellation deadline has passed. Orders must be cancelled at least 2 days before shipping date (by ${cutoffDate.toLocaleDateString('en-IN')} 12:00 PM).`
-          )
-        );
-      }
+      return failure(
+        new ValidationError(
+          `Cannot cancel - order has already been shipped. Please contact support for assistance.`
+        )
+      );
     }
 
     const updateRes = await this.updateOrderStatus(
@@ -291,17 +285,30 @@ export class OrderServiceImpl implements OrderService {
     );
     if (!updateRes.success) return updateRes;
 
-    // If payment never completed, reflect that explicitly instead of leaving
-    // it stuck on "pending" indefinitely. If it was already paid, leave the
-    // payment_status as PAID — refunding is a separate admin-initiated step.
-    if (updateRes.value.payment_status === PaymentStatus.PENDING) {
-      const paymentUpdateRes = await this.orderRepo.update(orderId, { payment_status: PaymentStatus.FAILED });
-      if (paymentUpdateRes.success) {
-        return success(paymentUpdateRes.value);
-      }
-      // Non-fatal: the order is cancelled either way, just log and return what we have.
-      logger.error(`[OrderService.cancelOrder] Could not update payment_status for order ${orderId}: ${paymentUpdateRes.error.message}`);
+    // Handle payment status based on current state
+    let newPaymentStatus = order.payment_status;
+    
+    if (order.payment_status === PaymentStatus.PENDING) {
+      // Payment never completed - mark as failed
+      newPaymentStatus = PaymentStatus.FAILED;
+    } else if (order.payment_status === PaymentStatus.PAID) {
+      // Online payment was completed - initiate refund
+      newPaymentStatus = PaymentStatus.REFUND_INITIATED;
+      logger.info(`[OrderService.cancelOrder] Initiating refund for paid order ${orderId}`);
+      // TODO: Integrate with Razorpay refund API here
+    } else if (order.payment_status === PaymentStatus.COD_PENDING) {
+      // COD order cancelled before delivery - no payment collected, just mark as failed
+      newPaymentStatus = PaymentStatus.FAILED;
     }
+
+    // Update payment status
+    const paymentUpdateRes = await this.orderRepo.update(orderId, { payment_status: newPaymentStatus });
+    if (paymentUpdateRes.success) {
+      return success(paymentUpdateRes.value);
+    }
+    
+    // Non-fatal: the order is cancelled either way, just log and return what we have.
+    logger.error(`[OrderService.cancelOrder] Could not update payment_status for order ${orderId}: ${paymentUpdateRes.error.message}`);
 
     return success(updateRes.value);
   }

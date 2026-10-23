@@ -25,21 +25,25 @@ export type ProductStatus = typeof ProductStatus[keyof typeof ProductStatus];
 
 export const OrderStatus = {
   PLACED: 'placed',
-  PENDING: 'placed',
   CONFIRMED: 'confirmed',
-  PROCESSING: 'processing',
   SHIPPED: 'shipped',
+  OUT_FOR_DELIVERY: 'out_for_delivery',
   DELIVERED: 'delivered',
+  PAYMENT_COLLECTED: 'payment_collected', // COD orders: after delivery, payment collected
   CANCELLED: 'cancelled',
-  REFUNDED: 'refunded',
+  RTO_INITIATED: 'rto_initiated', // Return to Origin
+  RTO_DELIVERED: 'rto_delivered',
 } as const;
 export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
 
 export const PaymentStatus = {
-  PENDING: 'pending',
-  PAID: 'paid',
-  FAILED: 'failed',
-  REFUNDED: 'refunded',
+  PENDING: 'pending', // Online payment not completed yet
+  PAID: 'paid', // Online payment successful
+  FAILED: 'failed', // Payment attempt failed
+  COD_PENDING: 'cod_pending', // COD order - payment to be collected on delivery
+  COD_COLLECTED: 'cod_collected', // COD payment collected
+  REFUND_INITIATED: 'refund_initiated', // Refund process started
+  REFUNDED: 'refunded', // Refund completed
 } as const;
 export type PaymentStatus = typeof PaymentStatus[keyof typeof PaymentStatus];
 

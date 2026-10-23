@@ -176,6 +176,20 @@ async function enrichCartItems(items) {
 
     return items.map((item) => {
       const product = productMap.get(item.product_id);
+      
+      // Parse net_weight from product catalog
+      let netWeight = 480; // Default: one bundle = 12 × 40g = 480g
+      if (product?.net_weight) {
+        if (typeof product.net_weight === "string") {
+          const parsed = parseInt(product.net_weight.replace(/[^0-9]/g, ""), 10);
+          if (!isNaN(parsed) && parsed > 0) {
+            netWeight = parsed;
+          }
+        } else if (typeof product.net_weight === "number" && product.net_weight > 0) {
+          netWeight = product.net_weight;
+        }
+      }
+      
       return {
         id: item.product_id,
         _id: item.product_id,
@@ -185,7 +199,7 @@ async function enrichCartItems(items) {
         flavor: product?.flavor || null,
         qty: item.quantity || 1,
         countInStock: product?.count_in_stock || 100,
-        netWeight: product?.net_weight || 200,
+        netWeight,
       };
     });
   } catch {

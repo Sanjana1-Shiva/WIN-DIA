@@ -7,6 +7,9 @@
         "build": "next build",
         "start": "next start",
         "lint": "eslint",
+        "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
         "backend:dev": "node --watch src/backend/server.js",
         "backend:install": "cd src/backend && npm install"
     },
@@ -29,12 +32,17 @@
         "xlsx": "^0.18.5"
     },
     "devDependencies": {
+        "@jest/globals": "^30.5.2",
+        "@types/jest": "^30.0.0",
         "@types/node": "^20",
         "@types/react": "^19",
         "@types/react-dom": "^19",
         "babel-plugin-react-compiler": "1.0.0",
         "eslint": "^9",
         "eslint-config-next": "16.2.12",
+        "jest": "^30.5.2",
+        "ts-jest": "^29.4.14",
+        "ts-node": "^10.9.2",
         "typescript": "^5"
     }
 }
