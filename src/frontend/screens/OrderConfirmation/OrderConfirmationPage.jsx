@@ -155,6 +155,40 @@ export default function OrderConfirmationPage() {
                       <p className={styles.itemName}>{item.name}</p>
                       {item.flavor && <p className={styles.itemFlavor}>{item.flavor}</p>}
                       <p className={styles.itemQty}>Qty: {item.qty}</p>
+                      
+                      {/* Combo Flavor Breakdown */}
+                      {item.flavorSelections && (
+                        <div style={{ 
+                          background: 'rgba(201,168,76,0.08)', 
+                          border: '1px solid rgba(201,168,76,0.25)', 
+                          borderRadius: '4px', 
+                          padding: '8px 10px', 
+                          marginTop: '8px',
+                          fontSize: '0.75rem'
+                        }}>
+                          <p style={{ fontWeight: 700, marginBottom: '6px', color: '#3B1F0F', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            📦 Your Combo Contents:
+                          </p>
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            {Object.entries(item.flavorSelections)
+                              .filter(([_, count]) => count > 0)
+                              .map(([flavorId, count]) => {
+                                const flavorNames = {
+                                  'curry-leaves': 'Curry Leaves',
+                                  'garlic': 'Garlic',
+                                  'jeera': 'Jeera',
+                                  'onion': 'Onion'
+                                };
+                                return (
+                                  <li key={flavorId} style={{ color: '#6B5948', paddingLeft: '12px', position: 'relative' }}>
+                                    <span style={{ position: 'absolute', left: 0, color: '#C9A84C', fontWeight: 'bold' }}>•</span>
+                                    <strong style={{ color: '#3B1F0F' }}>{flavorNames[flavorId]}</strong>: {count} packet{count > 1 ? 's' : ''} ({count * 40}g)
+                                  </li>
+                                );
+                              })}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                     <div className={styles.itemPrice}>₹{(item.price * item.qty).toFixed(2)}</div>
                   </div>

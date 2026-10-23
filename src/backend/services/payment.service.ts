@@ -367,11 +367,13 @@ export class PaymentServiceImpl implements PaymentService {
   /**
    * Verifies the Razorpay webhook signature against RAZORPAY_WEBHOOK_SECRET (when configured).
    * Uses a timing-safe comparison to avoid leaking signature validity via timing.
+   * SECURITY: Rejects webhooks if secret is not configured or is a placeholder.
    */
   private async verifyWebhookSignature(payload: Record<string, unknown>, signature: string): Promise<Result<true, AppError>> {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
     if (!webhookSecret || webhookSecret.startsWith('REPLACE_ME')) {
-      return success(true);
+      logger.error('[PaymentService.handleWebhook] RAZORPAY_WEBHOOK_SECRET not configured - rejecting webhook for security');
+      return failure(new ValidationError('Webhook signature verification not configured - webhook rejected'));
     }
 
     const rawBody = JSON.stringify(payload);
@@ -425,52 +427,44 @@ export class PaymentServiceImpl implements PaymentService {
       return;
     }
 
-    await this.processSuccessfulPayment(paymentRecord.id, razorpayPaymentId, paymentEntity);
-
     const orderId = paymentRecord.order_id;
-    if (!orderId) return;
+    if (!orderId) {
+      logger.warn(`[PaymentService.handleWebhook] Payment ${paymentRecord.id} has no order_id — cannot process`);
+      return;
+    }
 
-    await this.orderRepo.update(orderId, {
-      order_status: 'processing' as any,
-      payment_status: 'paid' as any,
-      razorpay_payment_id: razorpayPaymentId,
-    } as any);
+    // Get order details for amount validation
+    const orderRes = await this.orderRepo.findById(orderId);
+    if (!orderRes.success || !orderRes.value) {
+      logger.error(`[PaymentService.handleWebhook] Order ${orderId} not found for payment ${paymentRecord.id}`);
+      return;
+    }
 
-    await this.deductStockForOrder(orderId);
+    // Use the new atomic RPC that confirms payment + deducts stock in one transaction
+    // This replaces the old pattern of separate processSuccessfulPayment + orderRepo.update + deductStockForOrder
+    const confirmRes = await this.inventoryService.confirmPaymentAndDeductStock({
+      orderId,
+      providerOrderId: razorpayOrderId,
+      transactionId: razorpayPaymentId,
+      amountInr: orderRes.value.total_price,
+    });
+
+    if (!confirmRes.success) {
+      logger.error(
+        `[PaymentService.handleWebhook] confirmPaymentAndDeductStock failed for order ${orderId}: ${confirmRes.error.message}`
+      );
+      // Still update payment record for reconciliation
+      await this.processSuccessfulPayment(paymentRecord.id, razorpayPaymentId, paymentEntity);
+      return;
+    }
+
+    logger.info(`[PaymentService.handleWebhook] ✅ Payment confirmed and stock deducted for order ${orderId}`);
 
     // Payment confirmed via webhook (may arrive before or instead of the
     // client-side verify call, e.g. if the user closed their browser) —
     // book the DTDC shipment automatically here too. autoBookShipment
-    // is idempotent (checks order.awb_code first), so this is safe even if
+    // is idempotent (checks order.tracking_number first), so this is safe even if
     // payment/verify already booked it.
     await autoBookShipment(orderId, '[PaymentService.handleWebhook]');
-  }
-
-  /**
-   * STOCK DEDUCTION: Deduct inventory after successful payment via webhook.
-   * This ensures stock is deducted even if the client-side verify call never completes
-   * (e.g., user closes browser). The atomic_deduct_stock RPC is idempotent in the sense
-   * that if verify already ran and deducted, the order items' stock is already gone.
-   * However, we guard against double-deduction by only calling this when payment
-   * transitions from non-paid → paid (see handlePaymentCapturedEvent).
-   */
-  private async deductStockForOrder(orderId: string): Promise<void> {
-    const itemsRes = await this.orderItemRepo.findByOrderId(orderId);
-
-    if (!itemsRes.success) {
-      logger.error(`[PaymentService.handleWebhook] Could not load order_items for order ${orderId}: ${itemsRes.error.message}`);
-      return;
-    }
-
-    for (const item of itemsRes.value) {
-      if (item.product_id && item.qty > 0) {
-        const deductRes = await this.inventoryService.deductStockAfterSuccessfulPayment(item.product_id, item.qty);
-        if (!deductRes.success) {
-          logger.error(
-            `[PaymentService.handleWebhook] Stock deduction failed for product ${item.product_id}: ${deductRes.error.message}`
-          );
-        }
-      }
-    }
   }
 }

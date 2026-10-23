@@ -99,7 +99,7 @@ export async function POST(
         return NextResponse.json(
           createErrorResponse(
             'VALIDATION_ERROR',
-            'Cannot cancel order - DTDC shipment is already in transit. AWB: ' + (shipment.awb_code || 'N/A')
+            'Cannot cancel order - DTDC shipment is already in transit. Tracking: ' + (shipment.tracking_number || 'N/A')
           ),
           { status: 400 }
         );
@@ -107,8 +107,8 @@ export async function POST(
 
       // If shipment was just created but not picked up, allow cancellation
       // (Admin should also cancel the DTDC booking separately if needed)
-      if (shipment.awb_code) {
-        console.warn(`[Admin Cancel] Order ${orderId} has DTDC booking (AWB: ${shipment.awb_code}) but not yet shipped. Admin should cancel DTDC booking separately.`);
+      if (shipment.tracking_number) {
+        console.warn(`[Admin Cancel] Order ${orderId} has DTDC booking (Tracking: ${shipment.tracking_number}) but not yet shipped. Admin should cancel DTDC booking separately.`);
       }
     }
 
@@ -134,8 +134,8 @@ export async function POST(
         payment_refund: order.payment_status === 'paid' 
           ? 'Payment status updated to refund_initiated. Process Razorpay refund manually through Razorpay dashboard.'
           : 'No refund needed - payment not completed',
-        dtdc_shipment: shipmentRes.success && shipmentRes.value?.awb_code
-          ? `DTDC booking exists (AWB: ${shipmentRes.value.awb_code}). Cancel shipment through DTDC if not picked up.`
+        dtdc_shipment: shipmentRes.success && shipmentRes.value?.tracking_number
+          ? `DTDC booking exists (Tracking: ${shipmentRes.value.tracking_number}). Cancel shipment through DTDC if not picked up.`
           : 'No DTDC shipment found',
       },
     });

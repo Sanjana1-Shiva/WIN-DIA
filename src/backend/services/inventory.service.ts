@@ -6,9 +6,17 @@ import { ProductRepository } from '../repositories/product.repository';
 import { logger } from '../utils/logger.util';
 import { container, RepositoryTokens } from '../providers/container.provider';
 
+export interface ConfirmPaymentAndDeductArgs {
+  orderId: string;
+  providerOrderId: string;
+  transactionId: string;
+  /** Verified amount in INR (not paise) */
+  amountInr: number;
+}
+
 export interface InventoryService {
   validateStock(productId: string, requiredQuantity: number): Promise<Result<Product, AppError>>;
-  deductStockAfterSuccessfulPayment(productId: string, quantity: number): Promise<Result<Product, AppError>>;
+  confirmPaymentAndDeductStock(args: ConfirmPaymentAndDeductArgs): Promise<Result<Record<string, unknown>, AppError>>;
   restoreStockAfterCancellation(productId: string, quantity: number): Promise<Result<Product, AppError>>;
 }
 
@@ -42,72 +50,51 @@ export class InventoryServiceImpl implements InventoryService {
     return success(product);
   }
 
-  public async deductStockAfterSuccessfulPayment(productId: string, quantity: number): Promise<Result<Product, AppError>> {
-    logger.info(`[InventoryService] Deducting ${quantity} stock for product ${productId} after payment`);
-
-    // ATOMIC stock decrement via atomic_deduct_stock() RPC.
-    // Returns TRUE if stock was successfully decremented, FALSE if insufficient stock.
-    // No fallback paths — the RPC migration MUST be deployed.
+  /**
+   * Sole path for successful Razorpay payments. One DB transaction: checks stored order/payment
+   * ids + amounts, updates payment/order status, deducts stock (in packets) and writes the ledger.
+   * Call ONLY after the payment was independently verified with Razorpay.
+   * Do not call deduct_windia_order_stock separately.
+   */
+  public async confirmPaymentAndDeductStock(args: ConfirmPaymentAndDeductArgs): Promise<Result<Record<string, unknown>, AppError>> {
     const { getAdminClient } = require('../config/supabase.config');
     const client = getAdminClient();
 
-    const { data, error } = await client
-      .rpc('atomic_deduct_stock', {
-        p_product_id: productId,
-        p_quantity: quantity,
-      });
+    const { data, error } = await client.rpc('confirm_windia_razorpay_payment_and_deduct_stock', {
+      p_order_id: args.orderId,
+      p_provider_order_id: args.providerOrderId,
+      p_transaction_id: args.transactionId,
+      p_amount: args.amountInr,
+    });
 
     if (error) {
-      logger.error(`[InventoryService] atomic_deduct_stock RPC failed for product ${productId}:`, error);
-      return failure(
-        new InventoryError(
-          `Stock deduction failed for product ${productId}: ${error.message}. ` +
-          `Ensure the atomic_deduct_stock migration has been deployed.`
-        )
-      );
+      logger.error(`[InventoryService] confirm_windia_razorpay_payment_and_deduct_stock failed for order ${args.orderId}: ${error.message}`);
+      return failure(new InventoryError(`Payment confirmation/stock deduction failed: ${error.message}`));
     }
 
-    // RPC returns FALSE when count_in_stock < quantity (insufficient stock)
-    if (data === false) {
-      const productRes = await this.productRepo.findById(productId);
-      const currentStock = productRes.success ? productRes.value?.count_in_stock : 'unknown';
-      return failure(
-        new InventoryError(
-          `Insufficient stock for product ${productId}: available ${currentStock}, requested ${quantity}. ` +
-          `Payment was captured but stock could not be reserved — manual reconciliation required.`
-        )
-      );
+    // The RPC returns JSON. Treat an explicit failure flag as a failure
+    // (exact shape isn't in the handoff — confirm with the DB owner).
+    if (data && typeof data === 'object' && ((data as any).success === false || (data as any).ok === false)) {
+      const msg = (data as any).error || (data as any).message || 'rejected by database';
+      logger.error(`[InventoryService] Confirm RPC rejected order ${args.orderId}: ${msg}`);
+      return failure(new InventoryError(`Payment confirmation rejected: ${msg}`));
     }
 
-    // Re-fetch the updated product
-    return this.productRepo.findById(productId);
+    return success((data ?? {}) as Record<string, unknown>);
   }
 
+  /**
+   * DISABLED: atomic_restore_stock is obsolete (stock is now per-flavour, in packets, via the
+   * deduction ledger). Restock-on-cancel needs a new DB function from the DB owner.
+   * Returns a failure instead of silently restoring the wrong thing.
+   */
   public async restoreStockAfterCancellation(productId: string, quantity: number): Promise<Result<Product, AppError>> {
-    logger.info(`[InventoryService] Restoring ${quantity} stock for product ${productId} after cancellation`);
-
-    // ATOMIC stock restoration via atomic_restore_stock() RPC.
-    // Prevents race conditions when multiple cancellations happen concurrently.
-    const { getAdminClient } = require('../config/supabase.config');
-    const client = getAdminClient();
-
-    const { data, error } = await client
-      .rpc('atomic_restore_stock', {
-        p_product_id: productId,
-        p_quantity: quantity,
-      });
-
-    if (error) {
-      logger.error(`[InventoryService] atomic_restore_stock RPC failed for product ${productId}:`, error);
-      return failure(
-        new InventoryError(
-          `Stock restoration failed for product ${productId}: ${error.message}. ` +
-          `Ensure the atomic_restore_stock migration has been deployed.`
-        )
-      );
-    }
-
-    // Re-fetch the updated product
-    return this.productRepo.findById(productId);
+    logger.warn(
+      `[InventoryService] restoreStockAfterCancellation(${productId}, ${quantity}) skipped — ` +
+      `atomic_restore_stock is obsolete; manual stock reconciliation required`
+    );
+    return failure(
+      new InventoryError('Automatic stock restoration is not available; manual reconciliation required')
+    );
   }
 }

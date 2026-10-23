@@ -82,32 +82,37 @@ export async function POST(request: Request) {
       });
     }
 
-    await paymentService.processSuccessfulPayment(paymentId, razorpay_payment_id, body);
-    // markOrderPaid updates BOTH order_status and payment_status together —
-    // updateOrderStatus alone only ever touched order_status, which is why
-    // payment_status stayed "pending" in the admin dashboard even after a
-    // successful client-side payment (it only got fixed if the webhook fired).
-    await orderService.markOrderPaid(orderId, 'Payment verified via Razorpay client SDK', authRes.value.id);
+    // Use the new single-transaction RPC that confirms payment AND deducts stock atomically.
+    // This replaces the old pattern of processSuccessfulPayment + markOrderPaid + individual deductions.
+    const orderRes = await orderService.getOrderById(orderId);
+    if (!orderRes.success || !orderRes.value) {
+      return NextResponse.json(
+        createErrorResponse('INTERNAL_SERVER_ERROR', 'Order not found after signature verification'),
+        { status: 500 }
+      );
+    }
 
-    // Fetch order_items directly from the order_items table using order_id.
-    // getOrderById only returns the orders row (no join) — it never contains order_items.
-    // order_items columns: product_id, qty.
-    const itemsRes = await orderItemRepo.findByOrderId(orderId);
-    if (itemsRes.success && itemsRes.value.length > 0) {
-      for (const item of itemsRes.value) {
-        if (item.product_id && item.qty > 0) {
-          const deductRes = await inventoryService.deductStockAfterSuccessfulPayment(item.product_id, item.qty);
-          if (!deductRes.success) {
-            // Log and continue — payment is already confirmed, do not fail the response
-            console.error(
-              `[payment/verify] Stock deduction failed for product ${item.product_id}:`,
-              deductRes.error.message
-            );
-          }
-        }
-      }
-    } else if (!itemsRes.success) {
-      console.error(`[payment/verify] Could not load order_items for order ${orderId}:`, itemsRes.error.message);
+    const confirmRes = await inventoryService.confirmPaymentAndDeductStock({
+      orderId,
+      providerOrderId: razorpay_order_id,
+      transactionId: razorpay_payment_id,
+      amountInr: orderRes.value.total_price,
+    });
+
+    if (!confirmRes.success) {
+      // Stock deduction failed — log but don't fail the response since payment is confirmed
+      console.error('[payment/verify] confirmPaymentAndDeductStock failed:', confirmRes.error.message);
+      
+      // Still mark payment successful (payment was verified with Razorpay)
+      await paymentService.processSuccessfulPayment(paymentId, razorpay_payment_id, body);
+      await orderService.markOrderPaid(orderId, 'Payment verified but stock deduction failed - manual reconciliation needed', authRes.value.id);
+      
+      return NextResponse.json({
+        success: true,
+        verified: true,
+        orderId,
+        warning: 'Payment confirmed but stock deduction failed - order requires manual reconciliation',
+      });
     }
 
     // Payment is confirmed — book the DTDC shipment automatically.

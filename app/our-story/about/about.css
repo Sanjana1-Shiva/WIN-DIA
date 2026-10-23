@@ -3380,3 +3380,185 @@
   margin-bottom: 0;
   padding-bottom: 0;
 }
+/* ==================================================
+   PROCESS SLIDER — BEHIND THE BRAND
+================================================== */
+
+.about-process-section {
+  background: #f5ede0;
+  padding: 6rem 1.5rem;
+}
+
+.about-process-container {
+  max-width: 1200px;
+  margin: auto;
+}
+
+.about-process-heading {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.about-process-label {
+  color: #7a9a6a;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.35em;
+}
+
+.about-process-title {
+  margin-top: 0.8rem;
+  color: #3d2b1f;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 2.6rem;
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.about-process-title-italic {
+  font-style: italic;
+  color: #6B4C35;
+}
+
+.about-process-slider {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  background: #faf5ee;
+  border: 1px solid rgba(107, 76, 53, 0.14);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.about-process-stage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #3d2b1f;
+}
+
+.about-process-frame {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(1.04);
+  transition: opacity 1.1s ease, transform 6.5s ease;
+}
+
+.about-process-frame-active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.about-process-img {
+  object-fit: cover;
+}
+
+.about-process-nav {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+}
+
+.about-process-nav-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.about-process-nav-btn:hover {
+  background: rgba(0, 0, 0, 0.34);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.about-process-caption {
+  padding: 3rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.about-process-count {
+  font-size: 12px;
+  color: #9aab8a;
+  letter-spacing: 0.1em;
+  margin: 0 0 0.9rem;
+}
+
+.about-process-heading-text {
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 500;
+  font-size: 1.9rem;
+  color: #3d2b1f;
+  margin: 0 0 0.9rem;
+  line-height: 1.2;
+}
+
+.about-process-body {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #6b5240;
+  margin: 0;
+  max-width: 34ch;
+}
+
+.about-process-rule-track {
+  height: 2px;
+  background: rgba(107, 76, 53, 0.14);
+  margin-top: 2rem;
+  position: relative;
+}
+
+.about-process-rule-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: #C8A96B;
+  transition: width 0.1s linear;
+}
+
+.about-process-thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 1.4rem;
+}
+
+.about-process-thumb {
+  flex: 1;
+  height: 4px;
+  background: rgba(107, 76, 53, 0.16);
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+.about-process-thumb-active {
+  background: #B85C38;
+}
+
+@media (max-width: 768px) {
+  .about-process-slider {
+    grid-template-columns: 1fr;
+  }
+
+  .about-process-caption {
+    padding: 2rem 1.75rem;
+  }
+
+  .about-process-title {
+    font-size: 2rem;
+  }
+}

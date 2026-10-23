@@ -101,3 +101,107 @@
   .item { grid-template-columns: 80px 1fr; }
   .itemRight { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
 }
+
+
+/* Validation messages */
+.validationMessage {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-top: 16px;
+  color: #856404;
+}
+
+.validationMessage svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 1.2rem;
+}
+
+.validationMessage strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+}
+
+.validationMessage p {
+  margin: 0 0 4px 0;
+  font-size: 0.85rem;
+}
+
+.validationMessage small {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.readyMessage {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #d4edda;
+  border: 1px solid #28a745;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-top: 16px;
+  color: #155724;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.readyMessage svg {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
+
+/* Flavor Breakdown for Combo */
+.flavorBreakdown {
+  background: rgba(201, 168, 76, 0.08);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+
+.flavorBreakdownTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--coco);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flavorList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flavorList li {
+  font-size: 0.8rem;
+  color: var(--coco-light);
+  padding-left: 16px;
+  position: relative;
+}
+
+.flavorList li::before {
+  content: "•";
+  position: absolute;
+  left: 4px;
+  color: var(--gold);
+  font-weight: bold;
+}
+
+.flavorList li strong {
+  color: var(--coco);
+  font-weight: 600;
+}

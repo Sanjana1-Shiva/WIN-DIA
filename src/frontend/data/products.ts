@@ -10,8 +10,13 @@ import comboImage from "@/src/frontend/assets/images/products/combo/combo-offer.
 
 /**
  * WIN-DIA FibreRich Product Catalogue
- * All products are 12-pack bundles (12 × 40g = 480g) priced at ₹640
- * Individual 40g packets are NOT purchasable
+ * NEW BUNDLE STRUCTURE (Updated):
+ * - 1 bundle = 6 packets (6 × 40g = 240g) at ₹384 (no discount)
+ * - 2 bundles = 12 packets at ₹640 (10 paid + 2 free)
+ * - 3 bundles = 18 packets at ₹896 (14 paid + 4 free)
+ * - Users can only order in multiples of 6 packets (6, 12, 18, 24...)
+ * 
+ * Each packet is 40g at ₹64
  */
 
 export const glutenFreeProducts = [
@@ -22,11 +27,11 @@ export const glutenFreeProducts = [
     flavour: "Jeera",
     image: [jeeraImage, jeerabackImage],
     description: "Roasted jeera, deep and comforting in every bite.",
-    price: "₹640",
-    offer: "12 × 40g Bundle",
-    offerDetails: "🎁 Pay for 10 + Get 2 FREE",
+    price: "₹384",
+    offer: "6 × 40g Bundle",
+    offerDetails: "",
     delivery: "🚚 Free Delivery",
-    netWeight: "480g",
+    netWeight: "240g",
   },
 ] as const;
 
@@ -38,11 +43,11 @@ export const everydayProducts = [
     flavour: "Garlic",
     image: [everydayGarlicImage, everydayGarlicbackImage],
     description: "A comforting garlic-forward snack for everyday moments.",
-    price: "₹640",
-    offer: "12 × 40g Bundle",
-    offerDetails: "🎁 Pay for 10 + Get 2 FREE",
+    price: "₹384",
+    offer: "6 × 40g Bundle",
+    offerDetails: "",
     delivery: "🚚 Free Delivery",
-    netWeight: "480g",
+    netWeight: "240g",
   },
   {
     id: "onion",
@@ -51,11 +56,11 @@ export const everydayProducts = [
     flavour: "Onion",
     image: [everydayOnionImage, everydayOnionbackImage],
     description: "A satisfying daily crunch with naturally savoury onion flavour.",
-    price: "₹640",
-    offer: "12 × 40g Bundle",
-    offerDetails: "🎁 Pay for 10 + Get 2 FREE",
+    price: "₹384",
+    offer: "6 × 40g Bundle",
+    offerDetails: "",
     delivery: "🚚 Free Delivery",
-    netWeight: "480g",
+    netWeight: "240g",
   },
   {
     id: "curry-leaf",
@@ -64,21 +69,22 @@ export const everydayProducts = [
     flavour: "Curry Leaves",
     image: [everydayCurryLeafImage, everydayCurryLeafbackImage],
     description: "A light, flavourful crunch with a herbaceous curry leaf finish.",
-    price: "₹640",
-    offer: "12 × 40g Bundle",
-    offerDetails: "🎁 Pay for 10 + Get 2 FREE",
+    price: "₹384",
+    offer: "6 × 40g Bundle",
+    offerDetails: "",
     delivery: "🚚 Free Delivery",
-    netWeight: "480g",
+    netWeight: "240g",
   },
 ] as const;
 
 export const comboOffer = {
-  id: "assorted-combo",
+  id: "9d17cedd-4abd-4765-af1e-f368d17bad32", // UUID from backend
+  slug: "windia-assorted-combo-v2", // Slug from backend  
   name: "WIN-DIA FibreRich Thins Assorted Combo",
-  title: "4 Flavours · 12 Packets",
+  title: "4 Flavours · 6 Packets",
   flavour: "Assorted",
   description:
-    "Get 3 packets each of Garlic, Jeera, Onion, and Curry Leaves in one bundle. 12 × 40g packs for ₹640.",
+    "Choose your perfect mix! Pick from Garlic, Jeera, Onion, and Curry Leaves. 6 packets in one bundle at ₹384.",
   flavours: [
     "Garlic",
     "Jeera",
@@ -86,17 +92,17 @@ export const comboOffer = {
     "Curry Leaves",
   ],
   image: comboImage,
-  price: "₹640",
-  offer: "12 × 40g Bundle",
-  offerDetails: "🎁 Pay for 10 + Get 2 FREE",
+  price: "₹384",
+  offer: "6 × 40g Bundle",
+  offerDetails: "Mix & Match Your Flavours",
   delivery: "🚚 Free Delivery",
-  netWeight: "480g",
-  packetCount: 12,
-  paidPackets: 10,
+  netWeight: "240g",
+  packetCount: 6,
+  paidPackets: 6,
   pricePerPacket: 64,
-  regularPrice: 768,
-  comboPrice: 640,
-  savings: 128,
+  regularPrice: 384,
+  comboPrice: 384,
+  savings: 0,
 } as const;
 
 type StoreProduct = {
@@ -130,7 +136,7 @@ const asStoreProduct = (
     price: Number(product.price.replace(/[^0-9.]/g, "")),
     image: product.image[0].src,
     countInStock: 100,
-    netWeight: 480,
+    netWeight: 240, // 1 bundle = 6 packets × 40g = 240g
   };
 }; 
 
@@ -151,8 +157,8 @@ export const normalizeProduct = (product: Record<string, unknown>): StoreProduct
       ? String((rawCategory as Record<string, unknown>).slug ?? "snacks")
       : String(rawCategory ?? "snacks");
 
-  // Parse net_weight: handle "480g" string format or numeric value
-  let netWeight = 480; // Default: 12 × 40g = 480g
+  // Parse net_weight: handle "240g" or "480g" string format or numeric value
+  let netWeight = 240; // Default: 6 × 40g = 240g (new bundle size)
   const rawWeight = product.net_weight ?? product.netWeight ?? product.weight;
   if (typeof rawWeight === "string") {
     const parsed = parseInt(rawWeight.replace(/[^0-9]/g, ""), 10);

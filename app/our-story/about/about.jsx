@@ -22,6 +22,14 @@ import blogCover from "./images/blog-cover.jpg";
 import nidhishreeImg from "./images/nidhishree.jpg";
 import { useState, useEffect, useRef } from "react";
 
+import processFactoryImg from "./images/process-factory.jpg";
+import processTeamImg from "./images/process-team.jpg";
+import processMillImg from "./images/process-milling.jpg";
+import processPackImg from "./images/process-packing.jpg";
+import processShapingImg from "./images/process-shaping.jpg";
+import processRoastingImg from "./images/process-roasting.jpg";
+import processQCImg from "./images/process-qc.jpg";
+
 const tabs = {
   mission: {
     title: "Bridge the growing fibre gap.",
@@ -74,6 +82,53 @@ const founders = [
     ],
   },
 ];
+
+const PROCESS_SLIDES = [
+  {
+    img: processFactoryImg,
+    tag: "Sourcing",
+    title: "Sourced by hand",
+    body: "Coconuts selected at the source, the same way it's always been done — no shortcuts on quality.",
+  },
+  {
+    img: processMillImg,
+    tag: "Milling",
+    title: "Milled fresh",
+    body: "Dried and milled in small batches to keep the fibre and flavor intact — old wisdom, new equipment.",
+  },
+  {
+    img: processShapingImg,
+    tag: "Shaping",
+    title: "Shaped, one at a time",
+    body: "Each Thin is hand-guided through the press — a small, deliberate step that keeps the texture right.",
+  },
+  {
+    img: processRoastingImg,
+    tag: "Roasting",
+    title: "Roasted to crisp",
+    body: "Slow-roasted on open plates until it's golden and crisp — the same method, done at scale.",
+  },
+  {
+    img: processQCImg,
+    tag: "Quality check",
+    title: "Checked before it travels",
+    body: "Every batch is inspected for colour, crunch and consistency before it's cleared for packing.",
+  },
+  {
+    img: processTeamImg,
+    tag: "Our people",
+    title: "Shaped by our team",
+    body: "Every Thin is shaped and checked by the people who take pride in getting it right, batch after batch.",
+  },
+  {
+    img: processPackImg,
+    tag: "Packing",
+    title: "Packed with care",
+    body: "Sealed fresh and boxed for the journey to you — the last step before it reaches your table.",
+  },
+];
+
+const PROCESS_SLIDE_DURATION = 6000; // ms
 
 const REGION_COUNTRIES = {
   "middle-east": ["SAU","ARE","IRN","IRQ","JOR","KWT","OMN","QAT","YEM","SYR","LBN","BHR","ISR","PSE"],
@@ -283,6 +338,18 @@ return (
         </div>
       </>
     )}
+  </div>
+</section>
+
+<section className="about-process-section">
+  <div className="about-process-container">
+    <div className="about-process-heading">
+      <span className="about-process-label">Behind the Brand</span>
+      <h2 className="about-process-title">
+        The hands. <span className="about-process-title-italic">The heat.</span> The harvest.
+      </h2>
+    </div>
+    <ProcessSlider />
   </div>
 </section>
 
@@ -829,6 +896,101 @@ function FounderModal({ founder, onClose }) {
             </div>
           </div>
 
+        </div>
+      </div>
+    </div>
+  );
+}
+function ProcessSlider() {
+  const [current, setCurrent] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const pausedRef = useRef(false);
+  const rafRef = useRef(null);
+  const startRef = useRef(Date.now());
+
+  const goTo = (index) => {
+    const next = (index + PROCESS_SLIDES.length) % PROCESS_SLIDES.length;
+    setCurrent(next);
+    startRef.current = Date.now();
+    setProgress(0);
+  };
+
+  useEffect(() => {
+    function tick() {
+      if (!pausedRef.current) {
+        const elapsed = Date.now() - startRef.current;
+        const pct = Math.min(100, (elapsed / PROCESS_SLIDE_DURATION) * 100);
+        setProgress(pct);
+        if (elapsed >= PROCESS_SLIDE_DURATION) {
+          setCurrent((c) => (c + 1) % PROCESS_SLIDES.length);
+          startRef.current = Date.now();
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const slide = PROCESS_SLIDES[current];
+
+  return (
+    <div
+      className="about-process-slider"
+      onMouseEnter={() => (pausedRef.current = true)}
+      onMouseLeave={() => (pausedRef.current = false)}
+    >
+      <div className="about-process-stage">
+        {PROCESS_SLIDES.map((s, i) => (
+          <div
+            key={s.tag}
+            className={`about-process-frame ${i === current ? "about-process-frame-active" : ""}`}
+          >
+            <Image src={s.img} alt={s.title} fill className="about-process-img" sizes="60vw" />
+          </div>
+        ))}
+
+        <div className="about-process-nav">
+          <button
+            type="button"
+            aria-label="Previous"
+            className="about-process-nav-btn"
+            onClick={() => goTo(current - 1)}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            aria-label="Next"
+            className="about-process-nav-btn"
+            onClick={() => goTo(current + 1)}
+          >
+            ›
+          </button>
+        </div>
+      </div>
+
+      <div className="about-process-caption">
+        <p className="about-process-count">
+          {String(current + 1).padStart(2, "0")} — {String(PROCESS_SLIDES.length).padStart(2, "0")}
+        </p>
+        <h3 className="about-process-heading-text">{slide.title}</h3>
+        <p className="about-process-body">{slide.body}</p>
+
+        <div className="about-process-rule-track">
+          <div className="about-process-rule-fill" style={{ width: `${progress}%` }} />
+        </div>
+
+        <div className="about-process-thumbs">
+          {PROCESS_SLIDES.map((s, i) => (
+            <button
+              key={s.tag}
+              type="button"
+              aria-label={`Go to slide ${i + 1}: ${s.title}`}
+              className={`about-process-thumb ${i === current ? "about-process-thumb-active" : ""}`}
+              onClick={() => goTo(i)}
+            />
+          ))}
         </div>
       </div>
     </div>
